@@ -1,6 +1,18 @@
 use std::{cell::LazyCell, ops::Deref};
 
-pub const BASE_URL: &str = "https://apps.usos.pwr.edu.pl";
+pub struct UsosUri;
+
+impl UsosUri {
+    pub const DOMAIN: &'static str = "apps.usos.pwr.edu.pl";
+
+    pub fn origin() -> String {
+        format!("https://{}", Self::DOMAIN)
+    }
+
+    pub fn with_path(path: impl AsRef<str>) -> String {
+        format!("{}{}", Self::origin(), path.as_ref())
+    }
+}
 
 pub struct Client {
     base_url: &'static str,
@@ -31,4 +43,4 @@ impl Deref for Client {
     }
 }
 
-pub const CLIENT: LazyCell<Client> = LazyCell::new(|| Client::new(BASE_URL));
+pub const CLIENT: LazyCell<Client> = LazyCell::new(|| Client::new("https://apps.usos.pwr.edu.pl"));

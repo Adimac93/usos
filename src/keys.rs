@@ -1,10 +1,11 @@
-use std::path::Path;
+use std::{env::VarError, path::Path};
 
+use anyhow::Context;
 use fantoccini::{error::CmdError, Locator};
 use secrecy::{ExposeSecret, Secret, SecretString};
 use serde::{Deserialize, Serialize};
 
-use crate::client::{BASE_URL, CLIENT};
+use crate::{client::{UsosUri, CLIENT}, errors::AppError};
 
 const CONSUMER_KEY_NAME: &str = "USOS_CONSUMER_KEY";
 const CONSUMER_SECRET_NAME: &str = "USOS_CONSUMER_SECRET";
@@ -17,34 +18,34 @@ pub struct ConsumerKey {
 }
 
 impl ConsumerKey {
-    pub fn from_env() -> Self {
-        let key = std::env::var(CONSUMER_KEY_NAME).unwrap();
-        let secret = SecretString::new(std::env::var(CONSUMER_SECRET_NAME).unwrap());
-        Self {
+    pub fn from_env() -> Result<Self, VarError> {
+        let key = std::env::var(CONSUMER_KEY_NAME)?;
+        let secret = SecretString::new(std::env::var(CONSUMER_SECRET_NAME)?);
+        Ok(Self {
             key,
             secret,
             owner: std::env::var(CONSUMER_KEY_OWNER).ok(),
-        }
+        })
     }
 
     pub async fn generate(
         app_name: &str,
         website_url: Option<&str>,
         email: &str,
-    ) -> reqwest::Result<Self> {
+    ) -> crate::Result<Self> {
         let form = RegistrationForm::new(app_name, website_url, email);
-        let response = CLIENT.get(format!("{BASE_URL}/developers")).send().await?;
-        let csrf_token_cookie = response.cookies().next().unwrap();
+        let response = CLIENT.get(UsosUri::with_path("/developers")).send().await?;
+        let csrf_token_cookie = response.cookies().next().ok_or(AppError::usos("Csrf token cookie expected but not found"))?;
 
         let response = CLIENT
-            .post(format!("{BASE_URL}/developers/submit"))
+            .post(UsosUri::with_path("/developers/submit"))
             .header(
                 "Cookie",
                 &format!("csrftoken={}", csrf_token_cookie.value()),
             )
-            .header("Host", "apps.usos.pwr.edu.pl")
-            .header("Origin", "https://apps.usos.pwr.edu.pl")
-            .header("Referer", "https://apps.usos.pwr.edu.pl/developers/")
+            .header("Host", UsosUri::DOMAIN)
+            .header("Origin", UsosUri::origin())
+            .header("Referer", UsosUri::with_path("/developers"))
             .header("X-CSRFToken", csrf_token_cookie.value())
             .form(&form)
             .send()
@@ -54,7 +55,7 @@ impl ConsumerKey {
             println!("Registration not successful. Response: {response:#?}");
         }
         
-        let reg: RegistrationResponse = response.json().await.unwrap();
+        let reg: RegistrationResponse = response.json().await.map_err(|e| AppError::invalid_json(e.to_string()))?;
         if reg.status != "success" {
             println!("Registration not successful. Status: {}", reg.status);
         }
@@ -66,16 +67,16 @@ impl ConsumerKey {
         });
     }
 
-    pub async fn revoke(self) -> reqwest::Result<()> {
+    pub async fn revoke(self) -> crate::Result<()> {
         let form = RevokeForm::new(self.key, self.secret.expose_secret());
         let response = CLIENT
-            .get(format!("{BASE_URL}/services/oauth/revoke_consumer_key"))
+            .get(UsosUri::with_path("/services/oauth/revoke_consumer_key"))
             .query(&form)
             .send()
             .await?;
 
         if response.status().is_client_error() {
-            let json = response.json::<serde_json::Value>().await.unwrap();
+            let json = response.json::<serde_json::Value>().await.map_err(|e| AppError::invalid_json(e.to_string()))?;
             let message = json["message"].as_str();
             println!("Revocation error: {message:?}")
         }
@@ -158,6 +159,7 @@ impl RevokeForm {
     }
 }
 
+
 pub async fn gen_consumer_keys(
     app_name: &str,
     website_url: Option<&str>,
@@ -168,7 +170,7 @@ pub async fn gen_consumer_keys(
         .await
         .unwrap();
 
-    client.goto(&format!("{BASE_URL}/developers/")).await?;
+    client.goto(&UsosUri::with_path("/developers")).await?;
     client
         .find(Locator::Id("appname"))
         .await?
@@ -208,7 +210,7 @@ async fn revoke_consumer_keys(consumer_key: &str, consumer_secret: &str) -> Resu
         .await
         .unwrap();
 
-    client.goto(&format!("{BASE_URL}/developers/")).await?;
+    client.goto(&UsosUri::with_path("/developers")).await?;
     client
         .find(Locator::Id("consumer_key"))
         .await?
