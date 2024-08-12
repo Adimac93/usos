@@ -1,5 +1,27 @@
-use std::str::FromStr;
+use std::{collections::HashSet, fmt::Display, str::FromStr};
+pub struct Scopes(HashSet<Scope>);
 
+impl Scopes {
+    pub fn new(scopes: HashSet<Scope>) -> Self {
+        Self(scopes)
+    }
+}
+
+impl Display for Scopes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.0
+                .iter()
+                .map(|scope| scope.to_string())
+                .collect::<Vec<_>>()
+                .join("|")
+        )
+    }
+}
+
+#[derive(Debug, Hash, Eq, PartialEq)]
 /// /services/apiref/scopes
 pub enum Scope {
     /// Allows access to get administration documents etc.
@@ -94,6 +116,41 @@ impl FromStr for Scope {
             "surveys_reports" => Ok(Self::SurveysReports),
             "theses_protocols_write" => Ok(Self::ThesesProtocolsEdit),
             _ => Err(()),
+        }
+    }
+}
+
+impl Display for Scope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AdministrativeDocuments => write!(f, "adm_documents"),
+            Self::Cards => write!(f, "cards"),
+            Self::ChangeAllPreferences => write!(f, "change_all_preferences"),
+            Self::CourseTests => write!(f, "crstests"),
+            Self::Dorms => write!(f, "dorm_admin"),
+            Self::ChangeUserAttributes => write!(f, "edit_user_attrs"),
+            Self::Email => write!(f, "email"),
+            Self::Events => write!(f, "events"),
+            Self::Grades => write!(f, "grades"),
+            Self::GradesWrite => write!(f, "grades_write"),
+            Self::MailClient => write!(f, "mailclient"),
+            Self::MobileNumbers => write!(f, "mobile_numbers"),
+            Self::OfflineAccess => write!(f, "offline_access"),
+            Self::OtherEmails => write!(f, "other_emails"),
+            Self::Payments => write!(f, "payments"),
+            Self::Personal => write!(f, "personal"),
+            Self::Photo => write!(f, "photo"),
+            Self::PlacementTests => write!(f, "placement_tests"),
+            Self::SessionDebugging => write!(f, "session_debugging_perms"),
+            Self::ClearanceSlips => write!(f, "slips"),
+            Self::ClearanceSlipsAdmin => write!(f, "slips_admin"),
+            Self::StaffPerspective => write!(f, "staff_perspective"),
+            Self::StudentExams => write!(f, "student_exams"),
+            Self::StudentExamsEdit => write!(f, "student_exams_write"),
+            Self::Studies => write!(f, "studies"),
+            Self::SurveysFilling => write!(f, "surveys_filling"),
+            Self::SurveysReports => write!(f, "surveys_reports"),
+            Self::ThesesProtocolsEdit => write!(f, "theses_protocols_write"),
         }
     }
 }
