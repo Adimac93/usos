@@ -22,6 +22,7 @@ impl Client {
         Self { base_url, client }
     }
 }
+
 impl Deref for Client {
     type Target = reqwest::Client;
 

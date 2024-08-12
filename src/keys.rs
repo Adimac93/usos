@@ -8,6 +8,7 @@ use crate::client::{BASE_URL, CLIENT};
 
 const CONSUMER_KEY_NAME: &str = "USOS_CONSUMER_KEY";
 const CONSUMER_SECRET_NAME: &str = "USOS_CONSUMER_SECRET";
+const CONSUMER_KEY_OWNER: &str = "USOS_CONSUMER_EMAIL";
 
 pub struct ConsumerKey {
     owner: Option<String>,
@@ -22,9 +23,10 @@ impl ConsumerKey {
         Self {
             key,
             secret,
-            owner: None,
+            owner: std::env::var(CONSUMER_KEY_OWNER).ok(),
         }
     }
+
     pub async fn generate(
         app_name: &str,
         website_url: Option<&str>,
@@ -32,40 +34,38 @@ impl ConsumerKey {
     ) -> reqwest::Result<Self> {
         let form = RegistrationForm::new(app_name, website_url, email);
         let response = CLIENT.get(format!("{BASE_URL}/developers")).send().await?;
+        let csrf_token_cookie = response.cookies().next().unwrap();
 
         let response = CLIENT
             .post(format!("{BASE_URL}/developers/submit"))
             .header(
                 "Cookie",
-                &format!("csrftoken={}", response.cookies().next().unwrap().value()),
+                &format!("csrftoken={}", csrf_token_cookie.value()),
             )
             .header("Host", "apps.usos.pwr.edu.pl")
             .header("Origin", "https://apps.usos.pwr.edu.pl")
             .header("Referer", "https://apps.usos.pwr.edu.pl/developers/")
-            .header(
-                "X-CSRFToken",
-                response
-                    .cookies()
-                    .find(|cookie| cookie.name() == "csrftoken")
-                    .unwrap()
-                    .value(),
-            )
+            .header("X-CSRFToken", csrf_token_cookie.value())
             .form(&form)
             .send()
             .await?;
-        if response.status().is_client_error() {
-            println!("Registration client error");
+        
+        if !response.status().is_success() {
+            println!("Registration not successful. Response: {response:#?}");
         }
+        
         let reg: RegistrationResponse = response.json().await.unwrap();
         if reg.status != "success" {
-            println!("Unexpected status: {}", reg.status);
+            println!("Registration not successful. Status: {}", reg.status);
         }
+
         return Ok(Self {
             key: reg.consumer_key,
             secret: reg.consumer_secret,
             owner: Some(email.into()),
         });
     }
+
     pub async fn revoke(self) -> reqwest::Result<()> {
         let form = RevokeForm::new(self.key, self.secret.expose_secret());
         let response = CLIENT
@@ -77,10 +77,11 @@ impl ConsumerKey {
         if response.status().is_client_error() {
             let json = response.json::<serde_json::Value>().await.unwrap();
             let message = json["message"].as_str();
-            println!("Revokation error: {message:?}")
+            println!("Revocation error: {message:?}")
         }
         Ok(())
     }
+
     pub async fn save_to_file(&self) -> Result<(), tokio::io::Error> {
         tokio::fs::write(
             Path::new(&format!(
