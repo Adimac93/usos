@@ -11,9 +11,9 @@ const CONSUMER_SECRET_NAME: &str = "USOS_CONSUMER_SECRET";
 const CONSUMER_KEY_OWNER: &str = "USOS_CONSUMER_EMAIL";
 
 pub struct ConsumerKey {
-    owner: Option<String>,
-    key: String,
-    secret: SecretString,
+    pub owner: Option<String>,
+    pub key: String,
+    pub secret: SecretString,
 }
 
 impl ConsumerKey {

@@ -3,10 +3,12 @@ use percent_encoding::{AsciiSet, NON_ALPHANUMERIC};
 use rand::distributions::{Alphanumeric, Distribution};
 use rand::thread_rng;
 use ring::hmac::{self, HMAC_SHA1_FOR_LEGACY_USE_ONLY};
+use secrecy::ExposeSecret;
 use std::collections::HashMap;
 
 const NONCE_LENGTH: usize = 32;
 const OAUTH_VERSION: &str = "1.0";
+use crate::keys::ConsumerKey;
 
 #[derive(Clone, Debug)]
 pub struct KeyPair {
@@ -31,7 +33,7 @@ fn rand_alphanumeric_string(target_len: usize) -> String {
 pub fn authorize<'a>(
     method: &str,
     uri: &str,
-    consumer: &KeyPair,
+    consumer: &ConsumerKey,
     token: Option<&KeyPair>,
     params: Option<HashMap<String, String>>,
 ) -> HashMap<String, String> {
@@ -53,7 +55,7 @@ pub fn authorize<'a>(
         method,
         uri,
         &to_query(&params),
-        &consumer.secret,
+        consumer.secret.expose_secret(),
         token.map(|t| t.secret.as_ref()),
     );
 
