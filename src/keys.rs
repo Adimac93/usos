@@ -4,8 +4,12 @@ use anyhow::Context;
 use fantoccini::{error::CmdError, Locator};
 use secrecy::{ExposeSecret, Secret, SecretString};
 use serde::{Deserialize, Serialize};
+use time::macros::format_description;
 
-use crate::{client::{UsosUri, CLIENT}, errors::AppError};
+use crate::{
+    client::{UsosUri, CLIENT},
+    errors::AppError,
+};
 
 const CONSUMER_KEY_NAME: &str = "USOS_CONSUMER_KEY";
 const CONSUMER_SECRET_NAME: &str = "USOS_CONSUMER_SECRET";
@@ -35,7 +39,10 @@ impl ConsumerKey {
     ) -> crate::Result<Self> {
         let form = RegistrationForm::new(app_name, website_url, email);
         let response = CLIENT.get(UsosUri::with_path("/developers")).send().await?;
-        let csrf_token_cookie = response.cookies().next().ok_or(AppError::usos("Csrf token cookie expected but not found"))?;
+        let csrf_token_cookie = response
+            .cookies()
+            .next()
+            .ok_or(AppError::usos("Csrf token cookie expected but not found"))?;
 
         let response = CLIENT
             .post(UsosUri::with_path("/developers/submit"))
@@ -50,12 +57,15 @@ impl ConsumerKey {
             .form(&form)
             .send()
             .await?;
-        
+
         if !response.status().is_success() {
             println!("Registration not successful. Response: {response:#?}");
         }
-        
-        let reg: RegistrationResponse = response.json().await.map_err(|e| AppError::invalid_json(e.to_string()))?;
+
+        let reg: RegistrationResponse = response
+            .json()
+            .await
+            .map_err(|e| AppError::invalid_json(e.to_string()))?;
         if reg.status != "success" {
             println!("Registration not successful. Status: {}", reg.status);
         }
@@ -76,7 +86,10 @@ impl ConsumerKey {
             .await?;
 
         if response.status().is_client_error() {
-            let json = response.json::<serde_json::Value>().await.map_err(|e| AppError::invalid_json(e.to_string()))?;
+            let json = response
+                .json::<serde_json::Value>()
+                .await
+                .map_err(|e| AppError::invalid_json(e.to_string()))?;
             let message = json["message"].as_str();
             println!("Revocation error: {message:?}")
         }
@@ -88,9 +101,11 @@ impl ConsumerKey {
             Path::new(&format!(
                 "./{}_consumer_key.env",
                 time::OffsetDateTime::now_utc()
+                    .format(format_description!("[year]-[month]-[day]_[hour]-[minute]"))
+                    .unwrap()
             )),
             format!(
-                "{CONSUMER_KEY_NAME}={}\n{CONSUMER_SECRET_NAME}={}\nUSOS_CONSUMER_EMAIL={}\n",
+                "{CONSUMER_KEY_NAME}={}\n{CONSUMER_SECRET_NAME}={}\n{CONSUMER_KEY_OWNER}={}\n",
                 self.key,
                 self.secret.expose_secret(),
                 self.owner.as_deref().unwrap_or_default(),
@@ -158,7 +173,6 @@ impl RevokeForm {
         }
     }
 }
-
 
 pub async fn gen_consumer_keys(
     app_name: &str,
