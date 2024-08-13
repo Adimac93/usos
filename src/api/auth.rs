@@ -27,11 +27,11 @@ pub struct OAuthAccessToken {
     secret: String,
 }
 
-pub async fn acquire_token_old(
+pub async fn acquire_request_token(
     consumer_key: &ConsumerKey,
     callback: Option<String>,
     scopes: Scopes,
-) -> crate::Result<OAuthAccessToken> {
+) -> crate::Result<OAuthRequestToken> {
     let callback = callback.unwrap_or("oob".into());
     let url = UsosUri::with_path("/services/oauth/request_token");
     let authorization = authorize(
@@ -47,9 +47,17 @@ pub async fn acquire_token_old(
 
     let response = CLIENT.post(&url).form(&authorization).send().await?;
 
+    let status = response.status();
     // TODO: util function to read USOS responses
     let body = response.text().await?;
-    println!("{body}");
+
+    // TODO: util function to convert erroneus reqwest::Response to AppError
+    if status.is_client_error() {
+        return Err(AppError::client(status, body));
+    } else if status.is_server_error() {
+        return Err(AppError::usos(body));
+    }
+
     let params = body
         .split('&')
         .map(|keyval| {
@@ -65,71 +73,69 @@ pub async fn acquire_token_old(
     let oauth_token_secret = *params
         .get("oauth_token_secret")
         .ok_or(AppError::usos("Invalid return param key"))?;
-    let oauth_callback_confirmed = *params
+    let _oauth_callback_confirmed = *params
         .get("oauth_callback_confirmed")
         .ok_or(AppError::usos("Invalid return param key"))?;
 
-    if &callback == "oob" {
-        let pin: String = todo!();
-
-        let url = UsosUri::with_path("/services/oauth/access_token");
-        let response = CLIENT
-            .post(&url)
-            .form(&authorize(
-                "POST",
-                &url,
-                consumer_key,
-                Some(&KeyPair::new(oauth_token.into(), oauth_token_secret.into())),
-                Some(HashMap::from([("oauth_verifier".into(), pin.into())])),
-            ))
-            .send()
-            .await?;
-
-        let body = response.text().await?;
-        let keys = body
-            .split('&')
-            .map(|keyval| {
-                Ok(keyval
-                    .split_once('=')
-                    .ok_or(AppError::usos("Invalid return params formatting"))?)
-            })
-            .collect::<crate::Result<HashMap<&str, &str>>>()?;
-        let oauth_token = *keys
-            .get("oauth_token")
-            .ok_or(AppError::usos("Invalid return param key"))?;
-        let oauth_token_secret = *keys
-            .get("oauth_token_secret")
-            .ok_or(AppError::usos("Invalid return param key"))?;
-
-        println!("User OAuth token: {oauth_token}");
-        println!("User OAuth token secret: {oauth_token_secret}");
-
-        return Ok(OAuthAccessToken {
-            token: oauth_token.into(),
-            secret: oauth_token_secret.into(),
-        });
-    }
-
-    Ok(OAuthAccessToken {
-        token: "".into(),
-        secret: "".into(),
+    Ok(OAuthRequestToken {
+        token: oauth_token.into(),
+        secret: oauth_token_secret.into(),
     })
-}
-
-pub async fn acquire_request_token(
-    consumer_key: &ConsumerKey,
-    callback: Option<String>,
-    scopes: Scopes,
-) -> crate::Result<OAuthRequestToken> {
-    todo!()
 }
 
 pub async fn acquire_access_token(
     consumer_key: &ConsumerKey,
-    request_token: String,
-    verifier: String,
+    request_token: OAuthRequestToken,
+    verifier: impl Into<String>,
 ) -> crate::Result<OAuthAccessToken> {
-    todo!()
+    let url = UsosUri::with_path("/services/oauth/access_token");
+    let response = CLIENT
+        .post(&url)
+        .form(&authorize(
+            "POST",
+            &url,
+            consumer_key,
+            Some(&KeyPair::new(
+                request_token.token.into(),
+                request_token.secret.into(),
+            )),
+            Some(HashMap::from([("oauth_verifier".into(), verifier.into())])),
+        ))
+        .send()
+        .await?;
+
+    let status = response.status();
+    let body = response.text().await?;
+
+    if status.is_client_error() {
+        return Err(AppError::client(status, body));
+    } else if status.is_server_error() {
+        return Err(AppError::usos(body));
+    }
+
+    println!("{body}");
+    let keys = body
+        .split('&')
+        .map(|keyval| {
+            Ok(keyval
+                .split_once('=')
+                .ok_or(AppError::usos("Invalid return params formatting"))?)
+        })
+        .collect::<crate::Result<HashMap<&str, &str>>>()?;
+    let oauth_token = *keys
+        .get("oauth_token")
+        .ok_or(AppError::usos("Invalid return param key"))?;
+    let oauth_token_secret = *keys
+        .get("oauth_token_secret")
+        .ok_or(AppError::usos("Invalid return param key"))?;
+
+    println!("User OAuth token: {oauth_token}");
+    println!("User OAuth token secret: {oauth_token_secret}");
+
+    return Ok(OAuthAccessToken {
+        token: oauth_token.into(),
+        secret: oauth_token_secret.into(),
+    });
 }
 
 #[cfg(test)]
@@ -157,13 +163,9 @@ mod tests {
     async fn acquire_request_token_is_successful() {
         dotenvy::dotenv().ok();
         let consumer_key = ConsumerKey::from_env().unwrap();
-        let _token = acquire_request_token(
-            &consumer_key,
-            None,
-            Scopes::new(HashSet::from([Scope::Studies])),
-        )
-        .await
-        .unwrap();
+        acquire_request_token(&consumer_key, None, Scopes::new(HashSet::new()))
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -172,12 +174,7 @@ mod tests {
         let mut consumer_key = ConsumerKey::from_env().unwrap();
         consumer_key.key.push('a');
 
-        let res = acquire_request_token(
-            &consumer_key,
-            None,
-            Scopes::new(HashSet::from([Scope::Studies])),
-        )
-        .await;
+        let res = acquire_request_token(&consumer_key, None, Scopes::new(HashSet::new())).await;
 
         assert!(res.is_err());
     }
@@ -197,7 +194,7 @@ mod tests {
 
         let verifier = get_pin(request_token.token.clone()).await;
 
-        let _access_token = acquire_access_token(&consumer_key, request_token.token, verifier)
+        let _access_token = acquire_access_token(&consumer_key, request_token, verifier)
             .await
             .unwrap();
     }
