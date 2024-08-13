@@ -52,10 +52,8 @@ pub async fn acquire_request_token(
     let body = response.text().await?;
 
     // TODO: util function to convert erroneus reqwest::Response to AppError
-    if status.is_client_error() {
-        return Err(AppError::client(status, body));
-    } else if status.is_server_error() {
-        return Err(AppError::usos(body));
+    if !status.is_success() {
+        return Err(AppError::http(status, body));
     }
 
     let params = body
@@ -63,19 +61,19 @@ pub async fn acquire_request_token(
         .map(|keyval| {
             Ok(keyval
                 .split_once('=')
-                .ok_or(AppError::usos("Invalid return params formatting"))?)
+                .context("Invalid return params formatting")?)
         })
         .collect::<crate::Result<HashMap<&str, &str>>>()?;
 
     let oauth_token = *params
         .get("oauth_token")
-        .ok_or(AppError::usos("Invalid return param key"))?;
+        .context("Invalid return param key")?;
     let oauth_token_secret = *params
         .get("oauth_token_secret")
-        .ok_or(AppError::usos("Invalid return param key"))?;
+        .context("Invalid return param key")?;
     let _oauth_callback_confirmed = *params
         .get("oauth_callback_confirmed")
-        .ok_or(AppError::usos("Invalid return param key"))?;
+        .context("Invalid return param key")?;
 
     Ok(OAuthRequestToken {
         token: oauth_token.into(),
@@ -107,10 +105,8 @@ pub async fn acquire_access_token(
     let status = response.status();
     let body = response.text().await?;
 
-    if status.is_client_error() {
-        return Err(AppError::client(status, body));
-    } else if status.is_server_error() {
-        return Err(AppError::usos(body));
+    if !status.is_success() {
+        return Err(AppError::http(status, body));
     }
 
     println!("{body}");
@@ -119,15 +115,15 @@ pub async fn acquire_access_token(
         .map(|keyval| {
             Ok(keyval
                 .split_once('=')
-                .ok_or(AppError::usos("Invalid return params formatting"))?)
+                .context("Invalid return params formatting")?)
         })
         .collect::<crate::Result<HashMap<&str, &str>>>()?;
     let oauth_token = *keys
         .get("oauth_token")
-        .ok_or(AppError::usos("Invalid return param key"))?;
+        .context("Invalid return param key")?;
     let oauth_token_secret = *keys
         .get("oauth_token_secret")
-        .ok_or(AppError::usos("Invalid return param key"))?;
+        .context("Invalid return param key")?;
 
     println!("User OAuth token: {oauth_token}");
     println!("User OAuth token secret: {oauth_token_secret}");

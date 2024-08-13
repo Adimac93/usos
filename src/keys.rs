@@ -42,7 +42,7 @@ impl ConsumerKey {
         let csrf_token_cookie = response
             .cookies()
             .next()
-            .ok_or(AppError::usos("Csrf token cookie expected but not found"))?;
+            .context("Csrf token cookie expected but not found")?;
 
         let response = CLIENT
             .post(UsosUri::with_path("/developers/submit"))
@@ -62,10 +62,7 @@ impl ConsumerKey {
             println!("Registration not successful. Response: {response:#?}");
         }
 
-        let reg: RegistrationResponse = response
-            .json()
-            .await
-            .map_err(|e| AppError::invalid_json(e.to_string()))?;
+        let reg: RegistrationResponse = response.json().await?;
         if reg.status != "success" {
             println!("Registration not successful. Status: {}", reg.status);
         }
@@ -86,10 +83,7 @@ impl ConsumerKey {
             .await?;
 
         if response.status().is_client_error() {
-            let json = response
-                .json::<serde_json::Value>()
-                .await
-                .map_err(|e| AppError::invalid_json(e.to_string()))?;
+            let json = response.json::<serde_json::Value>().await?;
             let message = json["message"].as_str();
             println!("Revocation error: {message:?}")
         }
