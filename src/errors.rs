@@ -6,6 +6,8 @@ use thiserror::Error;
 pub enum AppError {
     #[error("Http error {code} - {message}")]
     Http { code: StatusCode, message: String },
+    #[error("Response parsing failed: {0}")]
+    Parse(String),
     #[error(transparent)]
     Unexpected(#[from] anyhow::Error),
 }
@@ -16,6 +18,10 @@ impl AppError {
             code,
             message: message.into(),
         }
+    }
+
+    pub fn parse(msg: impl Into<String>) -> Self {
+        Self::Parse(msg.into())
     }
 }
 

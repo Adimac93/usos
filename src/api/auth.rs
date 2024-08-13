@@ -13,6 +13,7 @@ use crate::{
     client::{UsosUri, CLIENT},
     errors::AppError,
     keys::ConsumerKey,
+    util::{parse_ampersand_params, ToAppResult},
 };
 
 use super::scopes::Scopes;
@@ -45,34 +46,26 @@ pub async fn acquire_request_token(
         ])),
     );
 
-    let response = CLIENT.post(&url).form(&authorization).send().await?;
+    let body = CLIENT
+        .post(&url)
+        .form(&authorization)
+        .send()
+        .await?
+        .to_app_result()
+        .await?
+        .text()
+        .await?;
 
-    let status = response.status();
-    // TODO: util function to read USOS responses
-    let body = response.text().await?;
+    let mut params = parse_ampersand_params(body)?;
 
-    // TODO: util function to convert erroneus reqwest::Response to AppError
-    if !status.is_success() {
-        return Err(AppError::http(status, body));
-    }
-
-    let params = body
-        .split('&')
-        .map(|keyval| {
-            Ok(keyval
-                .split_once('=')
-                .context("Invalid return params formatting")?)
-        })
-        .collect::<crate::Result<HashMap<&str, &str>>>()?;
-
-    let oauth_token = *params
-        .get("oauth_token")
+    let oauth_token = params
+        .remove("oauth_token")
         .context("Invalid return param key")?;
-    let oauth_token_secret = *params
-        .get("oauth_token_secret")
+    let oauth_token_secret = params
+        .remove("oauth_token_secret")
         .context("Invalid return param key")?;
-    let _oauth_callback_confirmed = *params
-        .get("oauth_callback_confirmed")
+    let _oauth_callback_confirmed = params
+        .remove("oauth_callback_confirmed")
         .context("Invalid return param key")?;
 
     Ok(OAuthRequestToken {
@@ -87,7 +80,7 @@ pub async fn acquire_access_token(
     verifier: impl Into<String>,
 ) -> crate::Result<OAuthAccessToken> {
     let url = UsosUri::with_path("/services/oauth/access_token");
-    let response = CLIENT
+    let body = CLIENT
         .post(&url)
         .form(&authorize(
             "POST",
@@ -100,33 +93,20 @@ pub async fn acquire_access_token(
             Some(HashMap::from([("oauth_verifier".into(), verifier.into())])),
         ))
         .send()
+        .await?
+        .to_app_result()
+        .await?
+        .text()
         .await?;
 
-    let status = response.status();
-    let body = response.text().await?;
+    let mut params = parse_ampersand_params(body)?;
 
-    if !status.is_success() {
-        return Err(AppError::http(status, body));
-    }
-
-    println!("{body}");
-    let keys = body
-        .split('&')
-        .map(|keyval| {
-            Ok(keyval
-                .split_once('=')
-                .context("Invalid return params formatting")?)
-        })
-        .collect::<crate::Result<HashMap<&str, &str>>>()?;
-    let oauth_token = *keys
-        .get("oauth_token")
+    let oauth_token = params
+        .remove("oauth_token")
         .context("Invalid return param key")?;
-    let oauth_token_secret = *keys
-        .get("oauth_token_secret")
+    let oauth_token_secret = params
+        .remove("oauth_token_secret")
         .context("Invalid return param key")?;
-
-    println!("User OAuth token: {oauth_token}");
-    println!("User OAuth token secret: {oauth_token_secret}");
 
     return Ok(OAuthAccessToken {
         token: oauth_token.into(),

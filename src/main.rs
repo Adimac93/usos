@@ -9,6 +9,7 @@ pub mod api;
 pub mod client;
 pub mod errors;
 pub mod keys;
+pub mod util;
 pub mod webdriver;
 
 type Result<T> = std::result::Result<T, AppError>;
