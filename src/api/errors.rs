@@ -1,17 +1,195 @@
 use std::{
-    collections::HashMap,
-    convert::Infallible,
-    fmt,
-    fmt::{Display, Formatter},
-    str::FromStr,
+    error::Error,
+    fmt::{self, write, Display, Formatter},
 };
 
+use super::scopes::Scope;
+use kind::ErrorKind;
+use reason::Reason;
 use serde::Deserialize;
 use serde_json::json;
+use user_message::UserMessages;
+pub mod kind;
+pub mod reason;
+pub mod user_message;
+
+#[derive(Debug)]
+pub struct UsosError {
+    /// Error description for the developer
+    message: String,
+    kind: Option<UsosErrorKind>,
+    user_messages: Option<UserMessages>,
+    missing_scopes: Option<Vec<Scope>>,
+}
+
+impl<'de> Deserialize<'de> for UsosError {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Self::from(RawError::deserialize(deserializer)?))
+    }
+}
+
+impl Error for UsosError {}
+
+impl Display for UsosError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.message)?;
+        if let Some(kind) = &self.kind {
+            write!(f, "\nKind: {kind}")?;
+        }
+        if let Some(scopes) = &self.missing_scopes {
+            write!(
+                f,
+                "\nMissing scopes: {}",
+                scopes
+                    .iter()
+                    .map(|scope| format!("'{scope}'"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )?;
+        }
+        if let Some(user_messages) = &self.user_messages {
+            write!(f, "\nUser messages: {}", user_messages)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub enum UsosErrorKind {
+    MethodForbidden {
+        reason: Reason,
+    },
+    ParamMissing {
+        param_name: String,
+    },
+    ParamInvalid {
+        param_name: String,
+    },
+    ParamForbidden {
+        param_name: String,
+        reason: Reason,
+    },
+    FieldNotFound {
+        field_name: String,
+        method_name: String,
+    },
+    FieldInvalid {
+        field_name: String,
+        method_name: String,
+    },
+    FieldForbidden {
+        field_name: String,
+        method_name: String,
+        reason: Reason,
+    },
+    ObjecetNotFound {
+        param_name: String,
+        method_name: String,
+    },
+    ObjectInvalid,
+    ObjectForbidden,
+}
+
+impl From<RawError> for UsosError {
+    fn from(error: RawError) -> Self {
+        let kind = error.kind.map(|kind| match kind {
+            ErrorKind::MethodForbidden => UsosErrorKind::MethodForbidden {
+                reason: error.reason.unwrap(),
+            },
+            ErrorKind::ParamMissing => UsosErrorKind::ParamMissing {
+                param_name: error.param_name.unwrap(),
+            },
+            ErrorKind::ParamInvalid => UsosErrorKind::ParamInvalid {
+                param_name: error.param_name.unwrap(),
+            },
+            ErrorKind::ParamForbidden => UsosErrorKind::ParamForbidden {
+                param_name: error.param_name.unwrap(),
+                reason: error.reason.unwrap(),
+            },
+            ErrorKind::FieldNotFound => UsosErrorKind::FieldNotFound {
+                field_name: error.field_name.unwrap(),
+                method_name: error.method_name.unwrap(),
+            },
+            ErrorKind::FieldInvalid => UsosErrorKind::FieldInvalid {
+                field_name: error.field_name.unwrap(),
+                method_name: error.method_name.unwrap(),
+            },
+            ErrorKind::FieldForbidden => UsosErrorKind::FieldForbidden {
+                field_name: error.field_name.unwrap(),
+                method_name: error.method_name.unwrap(),
+                reason: error.reason.unwrap(),
+            },
+            ErrorKind::ObjectNotFound => UsosErrorKind::ObjecetNotFound {
+                param_name: error.param_name.unwrap(),
+                method_name: error.method_name.unwrap(),
+            },
+            ErrorKind::ObjectInvalid => UsosErrorKind::ObjectInvalid,
+            ErrorKind::ObjectForbidden => UsosErrorKind::ObjectForbidden,
+        });
+        UsosError {
+            message: error.message,
+            kind,
+            user_messages: error.user_messages,
+            missing_scopes: error.missing_scopes,
+        }
+    }
+}
+
+impl Display for UsosErrorKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            UsosErrorKind::MethodForbidden { reason } => {
+                write!(f, "Method is forbidden - {reason}")
+            }
+            UsosErrorKind::ParamMissing { param_name } => {
+                write!(f, "Parameter is missing: '{param_name}'")
+            }
+            UsosErrorKind::ParamInvalid { param_name } => {
+                write!(f, "Parameter is invalid: '{param_name}'")
+            }
+            UsosErrorKind::ParamForbidden { param_name, reason } => {
+                write!(
+                    f,
+                    "Parameter is forbidden: '{param_name}' Reason: {reason})"
+                )
+            }
+            UsosErrorKind::FieldNotFound {
+                field_name,
+                method_name,
+            } => write!(f, "Field not found: '{field_name}' Method: '{method_name}'"),
+            UsosErrorKind::FieldInvalid {
+                field_name,
+                method_name,
+            } => write!(
+                f,
+                "Field is invalid: '{field_name}' Method: '{method_name}'"
+            ),
+            UsosErrorKind::FieldForbidden {
+                field_name,
+                method_name,
+                reason,
+            } => write!(
+                f,
+                "Field is forbidden: '{field_name}' Method: '{method_name}' Reason: {reason})"
+            ),
+            UsosErrorKind::ObjecetNotFound {
+                param_name,
+                method_name,
+            } => write!(
+                f,
+                "Object not found: '{param_name}' Method: '{method_name}'"
+            ),
+            UsosErrorKind::ObjectInvalid => write!(f, "Object is invalid"),
+            UsosErrorKind::ObjectForbidden => write!(f, "Object is forbidden"),
+        }
+    }
+}
 
 #[derive(Deserialize)]
-struct Error {
-    /// Error description for the developer
+struct RawError {
     message: String,
     #[serde(rename = "error")]
     kind: Option<ErrorKind>,
@@ -20,133 +198,7 @@ struct Error {
     param_name: Option<String>,
     field_name: Option<String>,
     method_name: Option<String>,
-    missing_scopes: Option<Vec<String>>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum ErrorKind {
-    /// access to the method is denied; in this case **reason** key is always present
-    MethodForbidden,
-    /// required parameter is not provided; an additional key **param_name** will contain the name of the parameter that caused this error;
-    ParamMissing,
-    /// value of the parameter is invalid; this type of error also contains **param_name** key;
-    ParamInvalid,
-    /// you are not allowed to use the parameter; in such case **param_name** and **reason** will be present;
-    ParamForbidden,
-    /// field specified in **fields** parameter does not exist; the name of the field will be passed in **field_name** key together with the name of the method (**method_name** key);
-    FieldNotFound,
-    /// specified field is invalid:
-    /// - you have provided subfields for field that does not refer to subobject(s);
-    /// - you have omitted subfields that were required;
-    /// - you have used secondary field, but only primary were allowed.
-    /// **field_name** and **method_name** keys will contain the name of the field and its method that caused the error.
-    FieldInvalid,
-    /// you do not have access to some of the requested fields (**field_name**, **method_name** and **reason** keys will be present);
-    FieldForbidden,
-    /// some of the referenced objects do not exist; if the object was referenced by one of parameters, the **param_name** and **method_name** keys will be present;
-    ObjectNotFound,
-    /// the referenced object is in state that prevents method execution; the detailed description of such errors is available in method documentation.
-    ObjectInvalid,
-    /// access to the referenced object was denied.
-    ObjectForbidden,
-}
-
-impl FromStr for ErrorKind {
-    type Err = (());
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "method_forbidden" => Ok(Self::MethodForbidden),
-            "param_missing" => Ok(Self::ParamMissing),
-            "param_invalid" => Ok(Self::ParamInvalid),
-            "param_forbidden" => Ok(Self::ParamForbidden),
-            "field_not_found" => Ok(Self::FieldNotFound),
-            "field_invalid" => Ok(Self::FieldInvalid),
-            "field_forbidden" => Ok(Self::FieldForbidden),
-            "object_not_found" => Ok(Self::ObjectNotFound),
-            "object_invalid" => Ok(Self::ObjectInvalid),
-            "object_forbidden" => Ok(Self::ObjectForbidden),
-            _ => Err(()),
-        }
-    }
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum Reason {
-    /// consumer signature is missing;
-    ConsumerMissing,
-    /// access token is required;
-    UserMissing,
-    /// secure connection (SSL) is required;
-    SecureRequired,
-    /// only administrative consumers are allowed;
-    TrustedRequired,
-    /// access token does not contain some of the required scopes; in this case an additional key **missing_scopes** will be present in the dictionary with the list of missing scopes;
-    ScopeMissing,
-    /// **as_user_id** parameter was used with a method which you do not have administrative access to;
-    ImpersonateRequired,
-    /// methods may define their own custom reason codes.
-    Custom(String),
-}
-
-impl FromStr for Reason {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "consumer_missing" => Ok(Self::ConsumerMissing),
-            "user_missing" => Ok(Self::UserMissing),
-            "secure_required" => Ok(Self::SecureRequired),
-            "trusted_required" => Ok(Self::TrustedRequired),
-            "scope_missing" => Ok(Self::ScopeMissing),
-            "impersonate_required" => Ok(Self::ImpersonateRequired),
-            _ => Ok(Self::Custom(s.to_string())),
-        }
-    }
-}
-
-#[derive(Deserialize)]
-struct UserMessages {
-    /// [`LanguageDictionary`] object, with the generic (context-free) message to be displayed for the user.
-    generic_message: Option<LanguageDictionary>,
-    /// possibly empty - dictionary of parameters which have failed the validation, along with LangDict messages for each of them. Usually, the keys of this dictionary will match the named of the method parameters, but it is not a strict rule (e.g. some methods expect the forms to be submitted in a single parameter, as a JSON-encoded string).
-    fields: Option<HashMap<String, LanguageDictionary>>,
-}
-
-#[derive(Deserialize)]
-struct LanguageDictionary(HashMap<Language, String>);
-
-impl LanguageDictionary {
-    pub fn get(&self, language: Language) -> &str {
-        self.0.get(&language).unwrap()
-    }
-
-    pub fn polish(&self) -> &str {
-        self.get(Language::Polish)
-    }
-
-    pub fn english(&self) -> &str {
-        self.get(Language::English)
-    }
-}
-
-#[derive(Deserialize, Hash, Eq, PartialEq)]
-enum Language {
-    #[serde(rename = "pl")]
-    Polish,
-    #[serde(rename = "en")]
-    English,
-}
-
-impl Display for Language {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Language::Polish => write!(f, "pl"),
-            Language::English => write!(f, "en"),
-        }
-    }
+    missing_scopes: Option<Vec<Scope>>,
 }
 
 #[test]
@@ -160,7 +212,8 @@ fn error_example_1() {
             },
         },
     });
-    let error = Error::deserialize(&json).unwrap();
+    let error = UsosError::deserialize(&json).unwrap();
+    println!("{error}")
 }
 
 #[test]
@@ -178,7 +231,8 @@ fn error_example_2() {
             }
         },
     });
-    let error = Error::deserialize(&json).unwrap();
+    let error = UsosError::deserialize(&json).unwrap();
+    println!("{error}")
 }
 
 #[test]
@@ -199,5 +253,6 @@ fn error_example_3() {
         },
     }
     );
-    let error = Error::deserialize(&json).unwrap();
+    let error = UsosError::deserialize(&json).unwrap();
+    println!("{error}")
 }
