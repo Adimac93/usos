@@ -1,6 +1,5 @@
-use std::str::FromStr;
-
 use serde::Deserialize;
+use std::str::FromStr;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]

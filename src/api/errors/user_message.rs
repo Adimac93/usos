@@ -1,9 +1,9 @@
+use crate::api::types::language::LanguageDictionary;
+use serde::Deserialize;
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
 };
-
-use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct UserMessages {
@@ -28,45 +28,5 @@ impl Display for UserMessages {
             write!(f, "{message}")?;
         }
         Ok(())
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct LanguageDictionary(HashMap<Language, String>);
-
-impl LanguageDictionary {
-    pub fn get(&self, language: Language) -> &str {
-        self.0.get(&language).unwrap()
-    }
-
-    pub fn polish(&self) -> &str {
-        self.get(Language::Polish)
-    }
-
-    pub fn english(&self) -> &str {
-        self.get(Language::English)
-    }
-}
-
-#[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
-pub enum Language {
-    #[serde(rename = "pl")]
-    Polish,
-    #[serde(rename = "en")]
-    English,
-}
-
-impl Display for LanguageDictionary {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.english())
-    }
-}
-
-impl Display for Language {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Language::Polish => write!(f, "pl"),
-            Language::English => write!(f, "en"),
-        }
     }
 }
