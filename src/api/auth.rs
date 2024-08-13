@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::Context;
+use secrecy::SecretString;
 
 use crate::{
     api::{
@@ -20,12 +21,12 @@ use super::scopes::Scopes;
 
 pub struct OAuthRequestToken {
     token: String,
-    secret: String,
+    secret: SecretString,
 }
 
 pub struct OAuthAccessToken {
     token: String,
-    secret: String,
+    secret: SecretString,
 }
 
 pub async fn acquire_request_token(
@@ -88,7 +89,7 @@ pub async fn acquire_access_token(
             consumer_key,
             Some(&KeyPair::new(
                 request_token.token.into(),
-                request_token.secret.into(),
+                request_token.secret,
             )),
             Some(HashMap::from([("oauth_verifier".into(), verifier.into())])),
         ))

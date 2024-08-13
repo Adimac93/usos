@@ -3,7 +3,7 @@ use percent_encoding::{AsciiSet, NON_ALPHANUMERIC};
 use rand::distributions::{Alphanumeric, Distribution};
 use rand::thread_rng;
 use ring::hmac::{self, HMAC_SHA1_FOR_LEGACY_USE_ONLY};
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, SecretString};
 use std::collections::HashMap;
 
 const NONCE_LENGTH: usize = 32;
@@ -13,11 +13,11 @@ use crate::keys::ConsumerKey;
 #[derive(Clone, Debug)]
 pub struct KeyPair {
     pub key: String,
-    pub secret: String,
+    pub secret: SecretString,
 }
 
 impl KeyPair {
-    pub fn new(key: String, secret: String) -> Self {
+    pub fn new(key: String, secret: SecretString) -> Self {
         KeyPair { key, secret }
     }
 }
@@ -56,7 +56,7 @@ pub fn authorize<'a>(
         uri,
         &to_query(&params),
         consumer.secret.expose_secret(),
-        token.map(|t| t.secret.as_ref()),
+        token.map(|t| t.secret.expose_secret().as_ref()),
     );
 
     params.insert("oauth_signature".into(), signature.into());
