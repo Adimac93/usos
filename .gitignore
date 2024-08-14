@@ -1,3 +1,6 @@
 /target
 *.env
-Cargo.lock
+**/Cargo.lock
+
+# Contains resulting code from usos-codegen
+/result

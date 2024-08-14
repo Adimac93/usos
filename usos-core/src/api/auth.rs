@@ -109,6 +109,9 @@ pub async fn acquire_access_token(
         .remove("oauth_token_secret")
         .context("Invalid return param key")?;
 
+    println!("Access token: {oauth_token}");
+    println!("Access token secret: {oauth_token_secret}");
+
     return Ok(OAuthAccessToken {
         token: oauth_token.into(),
         secret: oauth_token_secret.into(),
@@ -116,25 +119,40 @@ pub async fn acquire_access_token(
 }
 
 #[cfg(test)]
+async fn get_pin(oauth_token: String) -> String {
+    println!(
+        "Please visit the following URL to authorize the application: {}",
+        UsosUri::with_path(&format!(
+            "/services/oauth/authorize?oauth_token={oauth_token}"
+        ))
+    );
+
+    let mut buf = String::new();
+    print!("Enter the verifier PIN: ");
+    std::io::stdout().flush().unwrap();
+    std::io::stdin().read_line(&mut buf).unwrap();
+    let pin = buf.trim();
+
+    return pin.into();
+}
+
+#[cfg(test)]
+pub async fn get_access_token(consumer_key: &ConsumerKey) -> Result<OAuthAccessToken, AppError> {
+    let request_token = acquire_request_token(
+        consumer_key,
+        None,
+        Scopes::new(HashSet::from([Scope::Studies])),
+    )
+    .await?;
+
+    let verifier = get_pin(request_token.token.clone()).await;
+
+    Ok(acquire_access_token(consumer_key, request_token, verifier).await?)
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
-
-    async fn get_pin(oauth_token: String) -> String {
-        println!(
-            "Please visit the following URL to authorize the application: {}",
-            UsosUri::with_path(&format!(
-                "/services/oauth/authorize?oauth_token={oauth_token}"
-            ))
-        );
-
-        let mut buf = String::new();
-        print!("Enter the verifier PIN: ");
-        std::io::stdout().flush().unwrap();
-        std::io::stdin().read_line(&mut buf).unwrap();
-        let pin = buf.trim();
-
-        return pin.into();
-    }
 
     #[tokio::test]
     async fn acquire_request_token_is_successful() {
@@ -161,18 +179,6 @@ mod tests {
     async fn oauth_flow_no_callback_provided() {
         dotenvy::dotenv().ok();
         let consumer_key = ConsumerKey::from_env().unwrap();
-        let request_token = acquire_request_token(
-            &consumer_key,
-            None,
-            Scopes::new(HashSet::from([Scope::Studies])),
-        )
-        .await
-        .unwrap();
-
-        let verifier = get_pin(request_token.token.clone()).await;
-
-        let _access_token = acquire_access_token(&consumer_key, request_token, verifier)
-            .await
-            .unwrap();
+        get_access_token(&consumer_key).await.unwrap();
     }
 }
