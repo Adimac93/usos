@@ -45,13 +45,31 @@ pub(crate) fn parse_ampersand_params(
     Ok(res)
 }
 
+pub enum Field<'a> {
+    One(&'a str),
+    Nested(&'a str, Vec<Field<'a>>),
+}
+
+pub(crate) fn format_selector_fields(fields: Vec<Field>) -> String {
+    fields
+        .into_iter()
+        .map(|x| match x {
+            Field::One(f) => f.into(),
+            Field::Nested(base, fields) => {
+                format!("{}[{}]", base, format_selector_fields(fields))
+            }
+        })
+        .collect::<Vec<String>>()
+        .join("|")
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
     use rstest::rstest;
 
-    use super::parse_ampersand_params;
+    use super::*;
 
     #[rstest]
     #[case("", &[])]
@@ -87,5 +105,16 @@ mod tests {
     fn parse_ampersand_separated_params_fails(#[case] text: &str) {
         let res = parse_ampersand_params(text);
         assert!(res.is_err())
+    }
+
+    #[rstest]
+    #[case(vec![], "")]
+    #[case(vec![Field::One("a")], "a")]
+    #[case(vec![Field::One("a"), Field::One("b")], "a|b")]
+    #[case(vec![Field::Nested("a", vec![Field::One("b"), Field::One("c")])], "a[b|c]")]
+    #[case(vec![Field::Nested("a", vec![Field::One("b")]), Field::One("c")], "a[b]|c")]
+    #[case(vec![Field::One("a"), Field::Nested("b", vec![Field::One("c"), Field::One("d")]), Field::One("e")], "a|b[c|d]|e")]
+    fn format_selectors_is_correct(#[case] input: Vec<Field>, #[case] exp: &str) {
+        assert_eq!(format_selector_fields(input), exp.to_string())
     }
 }
