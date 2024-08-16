@@ -2,13 +2,15 @@ use std::fmt::Display;
 
 use inquire::{MultiSelect, Select};
 use reqwest::{Client, Response};
-use serde::Deserialize;
-use serde_json::Value;
 
-use crate::{errors::AppError, UsosUri};
+use crate::{
+    errors::AppError,
+    module_system::{ModuleItem, ModuleItemKind, ModuleItems},
+    UsosUri,
+};
 
 #[derive(Debug)]
-enum GeneratedItems {
+pub enum GeneratedItems {
     Structs,
     Functions,
     Both,
@@ -37,7 +39,7 @@ pub struct GenerationOptions {
 impl GenerationOptions {
     pub async fn prompt_cli(client: Client) -> Result<Self, AppError> {
         let mut curr_module = "services".to_string();
-        let mut answers: Vec<Answer>;
+        let mut answers: Vec<ModuleItem>;
         let mut doing_specific_search = false;
         let mut last_answer_empty = false;
 
@@ -64,9 +66,9 @@ impl GenerationOptions {
                 break;
             } else if answers.len() == 1 {
                 let only_answer = answers.pop().unwrap();
-                if matches!(only_answer, Answer::Module(_)) {
+                if only_answer.kind == ModuleItemKind::Module {
                     doing_specific_search = true;
-                    curr_module = only_answer.into_inner_string();
+                    curr_module = only_answer.name;
                 } else {
                     break;
                 }
@@ -87,46 +89,7 @@ impl GenerationOptions {
 
         Ok(GenerationOptions {
             items,
-            endpoints: answers.into_iter().map(|x| x.into_inner_string()).collect(),
+            endpoints: answers.into_iter().map(|x| x.name).collect(),
         })
-    }
-}
-
-#[derive(Deserialize)]
-pub struct ModuleItems {
-    submodules: Vec<String>,
-    methods: Vec<String>,
-}
-
-#[derive(Debug)]
-pub enum Answer {
-    Module(String),
-    Endpoint(String),
-}
-
-impl Answer {
-    fn into_inner_string(self) -> String {
-        match self {
-            Answer::Module(x) => x,
-            Answer::Endpoint(x) => x,
-        }
-    }
-}
-
-impl Display for Answer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Answer::Module(x) => write!(f, "Module: {x}"),
-            Answer::Endpoint(x) => write!(f, "Endpoint: {x}"),
-        }
-    }
-}
-
-impl From<ModuleItems> for Vec<Answer> {
-    fn from(val: ModuleItems) -> Self {
-        let modules = val.submodules.into_iter().map(|x| Answer::Module(x));
-        let endpoints = val.methods.into_iter().map(|x| Answer::Endpoint(x));
-
-        modules.chain(endpoints).collect()
     }
 }

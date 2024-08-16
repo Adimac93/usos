@@ -1,15 +1,13 @@
-use std::fmt::Display;
-
 use cli::GenerationOptions;
 use errors::AppError;
 use generation::generate_from_json_docs;
-use inquire::{MultiSelect, Select};
 use reqwest::Client;
 use serde_json::Value;
 
 pub mod cli;
 pub mod errors;
 pub mod generation;
+pub mod module_system;
 
 pub async fn get_docs(client: Client, path: impl AsRef<str>) -> Result<Value, AppError> {
     Ok(client
