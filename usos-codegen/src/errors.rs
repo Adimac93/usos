@@ -30,3 +30,9 @@ impl From<reqwest::Error> for AppError {
         Self::Unexpected(anyhow!(value))
     }
 }
+
+impl From<inquire::error::InquireError> for AppError {
+    fn from(value: inquire::error::InquireError) -> Self {
+        Self::Unexpected(anyhow!(value))
+    }
+}
