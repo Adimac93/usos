@@ -37,7 +37,7 @@ pub struct GenerationOptions {
 }
 
 impl GenerationOptions {
-    pub async fn prompt_cli(client: Client) -> Result<Self, AppError> {
+    pub async fn prompt_cli(client: &Client) -> Result<Self, AppError> {
         let mut curr_module = "services".to_string();
         let mut answers: Vec<ModuleItem>;
         let mut doing_specific_search = false;

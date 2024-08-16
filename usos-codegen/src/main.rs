@@ -9,7 +9,7 @@ pub mod errors;
 pub mod generation;
 pub mod module_system;
 
-pub async fn get_docs(client: Client, path: impl AsRef<str>) -> Result<Value, AppError> {
+pub async fn get_docs(client: &Client, path: impl AsRef<str>) -> Result<Value, AppError> {
     Ok(client
         .get(UsosUri::with_path("services/apiref/method"))
         .query(&[("name", path.as_ref())])
@@ -35,11 +35,11 @@ async fn main() {
 
     let client = Client::new();
 
-    let options = GenerationOptions::prompt_cli(client).await.unwrap();
+    let options = GenerationOptions::prompt_cli(&client).await.unwrap();
 
     println!("{options:?}");
 
-    // let res = get_docs(client, "services/users/user").await.unwrap();
+    let res = get_docs(&client, "services/users/user").await.unwrap();
 
-    // generate_from_json_docs(res).await.unwrap();
+    generate_from_json_docs(res).await.unwrap();
 }
