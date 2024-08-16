@@ -32,8 +32,8 @@ impl Display for GeneratedItems {
 
 #[derive(Debug)]
 pub struct GenerationOptions {
-    pub items: GeneratedItems,
-    pub endpoints: Vec<String>,
+    pub endpoint_items: GeneratedItems,
+    pub module_tree_items: Vec<ModuleItem>,
 }
 
 impl GenerationOptions {
@@ -52,15 +52,9 @@ impl GenerationOptions {
                 "Select modules/endpoints: "
             };
 
-            let res: Response = client
-                .get(UsosUri::with_path("services/apiref/module"))
-                .query(&[("name", &curr_module)])
-                .send()
-                .await?;
+            let options = ModuleItems::get_from_usos(client, &curr_module).await?;
 
-            let endpoints = res.json::<ModuleItems>().await?.into();
-
-            answers = MultiSelect::new(prompt, endpoints).prompt()?;
+            answers = MultiSelect::new(prompt, options.into_inner()).prompt()?;
 
             last_answer_empty = answers.is_empty();
             if answers.len() > 1 {
@@ -76,7 +70,7 @@ impl GenerationOptions {
             }
         }
 
-        let items = Select::new(
+        let endpoint_items = Select::new(
             "Items to generate",
             vec![
                 GeneratedItems::Structs,
@@ -87,8 +81,8 @@ impl GenerationOptions {
         .prompt()?;
 
         Ok(GenerationOptions {
-            items,
-            endpoints: answers.into_iter().map(|x| x.name).collect(),
+            endpoint_items,
+            module_tree_items: answers,
         })
     }
 }

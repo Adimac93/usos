@@ -1,6 +1,6 @@
 use cli::GenerationOptions;
 use errors::AppError;
-use generation::generate_from_json_docs;
+use generation::generate;
 use reqwest::Client;
 use serde_json::Value;
 
@@ -8,16 +8,6 @@ pub mod cli;
 pub mod errors;
 pub mod generation;
 pub mod module_system;
-
-pub async fn get_docs(client: &Client, path: impl AsRef<str>) -> Result<Value, AppError> {
-    Ok(client
-        .get(UsosUri::with_path("services/apiref/method"))
-        .query(&[("name", path.as_ref())])
-        .send()
-        .await?
-        .json()
-        .await?)
-}
 
 struct UsosUri;
 
@@ -37,9 +27,5 @@ async fn main() {
 
     let options = GenerationOptions::prompt_cli(&client).await.unwrap();
 
-    println!("{options:?}");
-
-    let res = get_docs(&client, "services/users/user").await.unwrap();
-
-    generate_from_json_docs(res).await.unwrap();
+    generate(&client, options).await.unwrap();
 }

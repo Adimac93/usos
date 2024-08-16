@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
+use reqwest::{Client, Response};
 use serde::Deserialize;
+
+use crate::{errors::AppError, UsosUri};
 
 #[derive(Debug, PartialEq)]
 pub enum ModuleItemKind {
@@ -47,17 +50,44 @@ impl Display for ModuleItem {
     }
 }
 
-impl From<ModuleItems> for Vec<ModuleItem> {
-    fn from(val: ModuleItems) -> Self {
+impl From<ModuleItemsRaw> for ModuleItems {
+    fn from(val: ModuleItemsRaw) -> Self {
         let modules = val.submodules.into_iter().map(|x| ModuleItem::module(x));
         let endpoints = val.methods.into_iter().map(|x| ModuleItem::endpoint(x));
 
-        modules.chain(endpoints).collect()
+        ModuleItems(modules.chain(endpoints).collect())
     }
 }
 
 #[derive(Deserialize)]
-pub struct ModuleItems {
+pub struct ModuleItemsRaw {
     submodules: Vec<String>,
     methods: Vec<String>,
+}
+
+impl ModuleItems {
+    pub async fn get_from_usos(
+        client: &Client,
+        base_module_name: impl AsRef<str>,
+    ) -> Result<Self, AppError> {
+        let res: Response = client
+            .get(UsosUri::with_path("services/apiref/module"))
+            .query(&[("name", base_module_name.as_ref())])
+            .send()
+            .await?;
+
+        Ok(res.json::<ModuleItemsRaw>().await?.into())
+    }
+}
+
+pub struct ModuleItems(Vec<ModuleItem>);
+
+impl ModuleItems {
+    pub fn new(items: Vec<ModuleItem>) -> Self {
+        Self(items)
+    }
+
+    pub fn into_inner(self) -> Vec<ModuleItem> {
+        self.0
+    }
 }

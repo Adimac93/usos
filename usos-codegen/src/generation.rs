@@ -1,14 +1,99 @@
+use std::path::{Path, PathBuf};
+
 use anyhow::Context;
+use reqwest::Client;
 use serde_json::Value;
-use tokio::io::AsyncWriteExt;
+use tokio::{fs::create_dir_all, io::AsyncWriteExt};
 
-use crate::errors::AppError;
+use crate::{
+    cli::GenerationOptions,
+    errors::AppError,
+    module_system::{ModuleItem, ModuleItemKind, ModuleItems},
+    UsosUri,
+};
 
-const GENERATED_CODE_DIR: &str = "result/code.rs";
+struct OutputDirectory;
 
-pub async fn generate_from_json_docs(docs: Value) -> Result<(), AppError> {
-    let mut file = tokio::fs::File::create(GENERATED_CODE_DIR).await.unwrap();
+impl OutputDirectory {
+    const BASE: &'static str = "result";
 
+    pub fn base() -> PathBuf {
+        PathBuf::new().join(Self::BASE)
+    }
+
+    pub fn from_endpoint_path(path: impl Into<String>) -> PathBuf {
+        PathBuf::from(format!("{}/{}.rs", Self::BASE, path.into()))
+    }
+}
+
+pub async fn generate(client: &Client, options: GenerationOptions) -> Result<(), AppError> {
+    for item in options.module_tree_items {
+        generate_module_item(client, item).await?;
+    }
+
+    Ok(())
+}
+
+#[async_recursion::async_recursion]
+pub async fn generate_module_item(client: &Client, item: ModuleItem) -> Result<(), AppError> {
+    match item.kind {
+        ModuleItemKind::Endpoint => generate_endpoint(client, item.name).await?,
+        ModuleItemKind::Module => {
+            let nested_items = ModuleItems::get_from_usos(client, item.name).await?;
+
+            for elem in nested_items.into_inner() {
+                generate_module_item(client, elem).await?;
+            }
+        }
+    };
+
+    Ok(())
+}
+
+pub async fn generate_endpoint(
+    client: &Client,
+    endpoint_path: impl AsRef<str>,
+) -> Result<(), AppError> {
+    let endpoint_path = endpoint_path.as_ref();
+    let docs: Value = get_usos_endpoint_docs(client, endpoint_path).await?;
+
+    let output_file_path = OutputDirectory::from_endpoint_path(endpoint_path);
+
+    create_dir_all(
+        output_file_path
+            .parent()
+            .context("Output directory path is empty")?,
+    )
+    .await
+    .context("Failed to create directory")?;
+
+    let mut file = tokio::fs::File::create(output_file_path)
+        .await
+        .context("Failed to create file")?;
+
+    let output = into_code(docs).await?;
+
+    file.write(output.as_bytes())
+        .await
+        .context("Failed to write to file")?;
+
+    Ok(())
+}
+
+pub async fn get_usos_endpoint_docs(
+    client: &Client,
+    path: impl AsRef<str>,
+) -> Result<Value, AppError> {
+    Ok(client
+        .get(UsosUri::with_path("services/apiref/method"))
+        .query(&[("name", path.as_ref())])
+        .send()
+        .await?
+        .json()
+        .await?)
+}
+
+pub async fn into_code(docs: Value) -> Result<String, AppError> {
     let docs = docs.as_object().unwrap();
 
     let name = docs.get("name").unwrap().as_str().unwrap();
@@ -60,9 +145,8 @@ pub async fn generate_from_json_docs(docs: Value) -> Result<(), AppError> {
     let arguments = generate_arguments(arguments);
     let output_fields = generate_output_struct_fields(fields);
 
-    file.write(
-        format!(
-            "#[derive(Deserialize)]
+    let res = format!(
+        "#[derive(Deserialize)]
 pub struct {pascal_case_name}Output {{
 {output_fields}
 }}
@@ -105,13 +189,9 @@ pub async fn {snake_case_name}(
 
     Ok(body)
 }}",
-        )
-        .as_bytes(),
-    )
-    .await
-    .context("Failed to write to file")?;
+    );
 
-    Ok(())
+    Ok(res)
 }
 
 fn generate_arguments(args: &[Value]) -> String {
