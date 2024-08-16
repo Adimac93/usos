@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use anyhow::Context;
 use reqwest::Client;
@@ -11,6 +14,8 @@ use crate::{
     module_system::{ModuleItem, ModuleItemKind, ModuleItems},
     UsosUri,
 };
+
+const REQUEST_DELAY: Duration = Duration::from_millis(100);
 
 struct OutputDirectory;
 
@@ -42,6 +47,7 @@ pub async fn generate_module_item(client: &Client, item: ModuleItem) -> Result<(
             let nested_items = ModuleItems::get_from_usos(client, item.name).await?;
 
             for elem in nested_items.into_inner() {
+                tokio::time::sleep(REQUEST_DELAY).await;
                 generate_module_item(client, elem).await?;
             }
         }
