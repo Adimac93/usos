@@ -62,6 +62,7 @@ impl GenerationOptions {
 
             answers = MultiSelect::new(prompt, endpoints).prompt()?;
 
+            last_answer_empty = answers.is_empty();
             if answers.len() > 1 {
                 break;
             } else if answers.len() == 1 {
@@ -73,8 +74,6 @@ impl GenerationOptions {
                     break;
                 }
             }
-
-            last_answer_empty = answers.is_empty();
         }
 
         let items = Select::new(
