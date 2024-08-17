@@ -9,6 +9,7 @@ impl UsosUri {
         format!("https://{}", Self::DOMAIN)
     }
 
+    // TODO: with_path should be a macro that checks syntax at compilation time
     pub fn with_path(path: impl AsRef<str>) -> String {
         format!("{}{}", Self::origin(), path.as_ref())
     }
@@ -43,4 +44,4 @@ impl Deref for Client {
     }
 }
 
-pub const CLIENT: LazyCell<Client> = LazyCell::new(|| Client::new("https://apps.usos.pwr.edu.pl"));
+pub const CLIENT: LazyCell<Client> = LazyCell::new(|| Client::new("https://apps.usos.pwr.edu.pl/"));

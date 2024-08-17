@@ -118,14 +118,46 @@ fn into_code(docs: MethodReference) -> Result<String, AppError> {
     let token_req = docs.auth_options.token;
     let ssl_required = docs.auth_options.ssl_required;
 
-    let consumer_key_type = with_requirement("&ConsumerKey", consumer_req);
-    let token_type = with_requirement("AccessToken", token_req);
+    let consumer_arg_line = ArgLine::with_requirement("consumer_key", "&ConsumerKey", consumer_req);
+    let token_arg_line = ArgLine::with_requirement("token", "AccessToken", token_req);
 
-    let arguments = generate_arguments(&docs.arguments);
+    let other_arguments = generate_arguments(&docs.arguments);
     let output_fields = generate_output_struct_fields(&docs.result_fields);
 
+    let authorize_import_lines = if consumer_req == SignatureRequirement::Ignored {
+        ""
+    } else {
+        "use crate::api::oauth1::authorize;\nuse crate::keys::ConsumerKey;\nuse std::collections::HashMap;\n\n"
+    };
+
+    let authorize_lines = if consumer_req == SignatureRequirement::Ignored {
+        ""
+    } else {
+        "\tlet authorization = authorize(
+        \"POST\",
+        &url,
+        consumer_key,
+        None,
+        Some(HashMap::from([
+            (\"oauth_callback\".into(), callback.clone()),
+        ])),
+    );\n"
+    };
+
+    let authorize_form_line = if consumer_req == SignatureRequirement::Ignored {
+        ""
+    } else {
+        "\t\t.form(&authorization)\n"
+    };
+
     let res = format!(
-        "#[derive(Deserialize)]
+        "{authorize_import_lines}use crate::{{
+    client::{{UsosUri, CLIENT}},
+    util::ToAppResult,
+}};
+use serde::Deserialize;
+
+#[derive(Deserialize)]
 pub struct {output_struct_name} {{
 {output_fields}
 }}
@@ -140,25 +172,13 @@ pub struct {output_struct_name} {{
 ///
 /// SSL: {ssl_required}
 pub async fn {snake_case_name}(
-    consumer_key: {consumer_key_type},
-    token: {token_type},
-{arguments}) -> {output_struct_name} {{
+{consumer_arg_line}{token_arg_line}{other_arguments}) -> crate::Result<{output_struct_name}> {{
     let callback = callback.unwrap_or(\"oob\".into());
     let url = UsosUri::with_path(\"{name}\");
-    let authorization = authorize(
-        <HTTP method, usually GET>,
-        &url,
-        consumer_key,
-        None,
-        Some(HashMap::from([
-            (\"oauth_callback\".into(), callback.clone()),
-        ])),
-    );
-
+{authorize_lines}
     let body = CLIENT
         .post(&url)
-        .form(&authorization)
-        .send()
+{authorize_form_line}\t\t.send()
         .await?
         .to_app_result()
         .await?
@@ -183,16 +203,11 @@ fn generate_argument(arg: &Argument) -> String {
     // Should we include deprecated arguments?
     let _is_deprecated = arg.is_deprecated;
 
-    let arg_name = &*arg.name;
-    let is_required = arg.is_required;
-
-    let arg_type = if is_required {
-        PLACEHOLDER_TYPE.into()
+    if arg.is_required {
+        ArgLine::required(&*arg.name, PLACEHOLDER_TYPE)
     } else {
-        option(PLACEHOLDER_TYPE)
-    };
-
-    format!("\t{arg_name}: {arg_type},\n")
+        ArgLine::optional(&*arg.name, PLACEHOLDER_TYPE)
+    }
 }
 
 fn generate_output_struct_fields(fields: &[Field]) -> String {
@@ -212,12 +227,28 @@ fn option(inner: impl AsRef<str>) -> String {
     format!("Option<{}>", inner.as_ref())
 }
 
-fn with_requirement(type_name: impl AsRef<str>, requirement: SignatureRequirement) -> String {
-    let type_name = type_name.as_ref();
+struct ArgLine;
 
-    match requirement {
-        SignatureRequirement::Ignored => "".to_string(),
-        SignatureRequirement::Optional => option(type_name),
-        SignatureRequirement::Required => type_name.to_string(),
+impl ArgLine {
+    fn optional(arg_name: impl AsRef<str>, arg_type: impl AsRef<str>) -> String {
+        format!("\t{}: {},\n", arg_name.as_ref(), option(arg_type.as_ref()))
+    }
+
+    fn required(arg_name: impl AsRef<str>, arg_type: impl AsRef<str>) -> String {
+        format!("\t{}: {},\n", arg_name.as_ref(), arg_type.as_ref())
+    }
+
+    fn with_requirement(
+        arg_name: impl AsRef<str>,
+        arg_type: impl AsRef<str>,
+        requirement: SignatureRequirement,
+    ) -> String {
+        let (arg_name, arg_type) = (arg_name.as_ref(), arg_type.as_ref());
+
+        match requirement {
+            SignatureRequirement::Ignored => "".to_string(),
+            SignatureRequirement::Optional => ArgLine::optional(arg_name, arg_type),
+            SignatureRequirement::Required => ArgLine::required(arg_name, arg_type),
+        }
     }
 }
