@@ -12,7 +12,6 @@ use serde_json::Value;
 use tokio::{fs::create_dir_all, io::AsyncWriteExt};
 
 use crate::{
-    cli::GenerationOptions,
     errors::AppError,
     module_system::{ModuleItem, ModuleItemKind, ModuleItems},
     reference::{Argument, Field, MethodReference, SignatureRequirement},
@@ -36,8 +35,8 @@ impl OutputDirectory {
     }
 }
 
-pub async fn generate(client: &Client, options: GenerationOptions) -> Result<(), AppError> {
-    for item in options.module_tree_items {
+pub async fn generate(client: &Client, items: Vec<ModuleItem>) -> Result<(), AppError> {
+    for item in items {
         traverse_module_item(client, item).await?;
     }
 

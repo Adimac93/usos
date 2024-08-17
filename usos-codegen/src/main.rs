@@ -1,4 +1,4 @@
-use cli::GenerationOptions;
+use cli::prompt_cli;
 use errors::AppError;
 use generation::generate;
 use reqwest::Client;
@@ -26,7 +26,7 @@ async fn main() {
 
     let client = Client::new();
 
-    let options = GenerationOptions::prompt_cli(&client).await.unwrap();
+    let options = prompt_cli(&client).await.unwrap();
 
     generate(&client, options).await.unwrap();
 }

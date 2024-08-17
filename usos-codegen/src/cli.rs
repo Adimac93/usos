@@ -9,80 +9,38 @@ use crate::{
     UsosUri,
 };
 
-#[derive(Debug)]
-pub enum GeneratedItems {
-    Structs,
-    Functions,
-    Both,
-}
+pub async fn prompt_cli(client: &Client) -> Result<Vec<ModuleItem>, AppError> {
+    let mut curr_module = "services".to_string();
+    let mut answers: Vec<ModuleItem>;
+    let mut doing_specific_search = false;
+    let mut last_answer_empty = false;
 
-impl Display for GeneratedItems {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                GeneratedItems::Structs => "Structs",
-                GeneratedItems::Functions => "Functions",
-                GeneratedItems::Both => "Both",
-            }
-        )
-    }
-}
+    loop {
+        let prompt = if last_answer_empty {
+            "The answer is empty - try again: "
+        } else if doing_specific_search {
+            "One module chosen - select individual submodules/endpoints: "
+        } else {
+            "Select modules/endpoints: "
+        };
 
-#[derive(Debug)]
-pub struct GenerationOptions {
-    pub endpoint_items: GeneratedItems,
-    pub module_tree_items: Vec<ModuleItem>,
-}
+        let options = ModuleItems::get_from_usos(client, &curr_module).await?;
 
-impl GenerationOptions {
-    pub async fn prompt_cli(client: &Client) -> Result<Self, AppError> {
-        let mut curr_module = "services".to_string();
-        let mut answers: Vec<ModuleItem>;
-        let mut doing_specific_search = false;
-        let mut last_answer_empty = false;
+        answers = MultiSelect::new(prompt, options.into_inner()).prompt()?;
 
-        loop {
-            let prompt = if last_answer_empty {
-                "The answer is empty - try again: "
-            } else if doing_specific_search {
-                "One module chosen - select individual submodules/endpoints: "
+        last_answer_empty = answers.is_empty();
+        if answers.len() > 1 {
+            break;
+        } else if answers.len() == 1 {
+            let only_answer = answers.pop().unwrap();
+            if only_answer.kind == ModuleItemKind::Module {
+                doing_specific_search = true;
+                curr_module = only_answer.name;
             } else {
-                "Select modules/endpoints: "
-            };
-
-            let options = ModuleItems::get_from_usos(client, &curr_module).await?;
-
-            answers = MultiSelect::new(prompt, options.into_inner()).prompt()?;
-
-            last_answer_empty = answers.is_empty();
-            if answers.len() > 1 {
                 break;
-            } else if answers.len() == 1 {
-                let only_answer = answers.pop().unwrap();
-                if only_answer.kind == ModuleItemKind::Module {
-                    doing_specific_search = true;
-                    curr_module = only_answer.name;
-                } else {
-                    break;
-                }
             }
         }
-
-        let endpoint_items = Select::new(
-            "Items to generate",
-            vec![
-                GeneratedItems::Structs,
-                GeneratedItems::Functions,
-                GeneratedItems::Both,
-            ],
-        )
-        .prompt()?;
-
-        Ok(GenerationOptions {
-            endpoint_items,
-            module_tree_items: answers,
-        })
     }
+
+    Ok(answers)
 }
