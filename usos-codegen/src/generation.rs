@@ -20,6 +20,7 @@ use crate::{
 
 const REQUEST_DELAY: Duration = Duration::from_millis(100);
 const PLACEHOLDER_TYPE: &str = "(type here)";
+const OMITTED_ARG_NAMES: [&str; 2] = ["format", "callback"];
 
 struct OutputDirectory;
 
@@ -172,7 +173,6 @@ pub struct {output_struct_name} {{
 /// SSL: {ssl_required}
 pub async fn {snake_case_name}(
 {consumer_arg_line}{token_arg_line}{other_arguments}) -> crate::Result<{output_struct_name}> {{
-    let callback = callback.unwrap_or(\"oob\".into());
     let url = UsosUri::with_path(\"{name}\");
 {authorize_lines}
     let body = CLIENT
@@ -201,6 +201,10 @@ fn generate_arguments(args: &[Argument]) -> String {
 fn generate_argument(arg: &Argument) -> String {
     // Should we include deprecated arguments?
     let _is_deprecated = arg.is_deprecated;
+
+    if OMITTED_ARG_NAMES.contains(&&*arg.name) {
+        return "".into();
+    }
 
     if arg.is_required {
         ArgLine::required(&*arg.name, PLACEHOLDER_TYPE)
