@@ -36,7 +36,7 @@ pub(crate) struct MethodReference {
     pub(crate) is_internal: bool,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum SignatureRequirement {
     Required,

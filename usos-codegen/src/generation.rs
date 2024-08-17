@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Context;
+use heck::{ToPascalCase, ToSnakeCase};
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
@@ -19,6 +20,7 @@ use crate::{
 };
 
 const REQUEST_DELAY: Duration = Duration::from_millis(100);
+const PLACEHOLDER_TYPE: &str = "(type here)";
 
 struct OutputDirectory;
 
@@ -46,7 +48,7 @@ pub async fn generate(client: &Client, options: GenerationOptions) -> Result<(),
 pub async fn traverse_module_item(client: &Client, item: ModuleItem) -> Result<(), AppError> {
     match item.kind {
         ModuleItemKind::Endpoint => {
-            generate_endpoint(client, item.name).await?;
+            generate_endpoint_file(client, item.name).await?;
             tokio::time::sleep(REQUEST_DELAY).await;
         }
         ModuleItemKind::Module => {
@@ -61,7 +63,7 @@ pub async fn traverse_module_item(client: &Client, item: ModuleItem) -> Result<(
     Ok(())
 }
 
-pub async fn generate_endpoint(
+pub async fn generate_endpoint_file(
     client: &Client,
     endpoint_path: impl AsRef<str>,
 ) -> Result<(), AppError> {
@@ -88,6 +90,8 @@ pub async fn generate_endpoint(
         .await
         .context("Failed to write to file")?;
 
+    println!("{endpoint_path}: success");
+
     Ok(())
 }
 
@@ -106,66 +110,31 @@ async fn get_usos_endpoint_docs(
 
 fn into_code(docs: MethodReference) -> Result<String, AppError> {
     let name = docs.name;
-    let auth_options = docs.auth_options;
-    let arguments = docs.arguments;
-    let fields = docs.result_fields;
+    let snake_case_name = name.to_snake_case();
+    let output_struct_name = format!("{}Output", name.to_pascal_case());
 
-    let consumer = auth_options.consumer;
-    let scopes = auth_options.scopes;
-    let token = auth_options.token;
-    let ssl_required = auth_options.ssl_required;
+    let consumer_req = docs.auth_options.consumer;
+    let scopes = docs.auth_options.scopes;
+    let token_req = docs.auth_options.token;
+    let ssl_required = docs.auth_options.ssl_required;
 
-    println!("name: {name}");
-    println!("consumer: {consumer}");
-    println!("scopes: {scopes:?}");
-    println!("token: {token}");
-    println!("ssl_required: {ssl_required}");
+    let consumer_key_type = with_requirement("&ConsumerKey", consumer_req);
+    let token_type = with_requirement("AccessToken", token_req);
 
-    let snake_case_name = name.replace('/', "_");
-    println!("snake case name: {snake_case_name}");
-
-    let mut make_uppercase = true;
-    let pascal_case_name = name.chars().fold("".to_string(), |mut acc, c| {
-        if c == '/' {
-            make_uppercase = true;
-        } else {
-            if make_uppercase {
-                acc.push(c.to_ascii_uppercase());
-            } else {
-                acc.push(c);
-            }
-            make_uppercase = false;
-        }
-        acc
-    });
-
-    // TODO: if ignored, don't write the argument.
-    let consumer_key_type = if consumer == SignatureRequirement::Required {
-        "&ConsumerKey"
-    } else {
-        "Option<&ConsumerKey>"
-    };
-
-    let token_type = if token == SignatureRequirement::Required {
-        "AccessToken"
-    } else {
-        "Option<AccessToken>"
-    };
-
-    let arguments = generate_arguments(&arguments);
-    let output_fields = generate_output_struct_fields(&fields);
+    let arguments = generate_arguments(&docs.arguments);
+    let output_fields = generate_output_struct_fields(&docs.result_fields);
 
     let res = format!(
         "#[derive(Deserialize)]
-pub struct {pascal_case_name}Output {{
+pub struct {output_struct_name} {{
 {output_fields}
 }}
 
 /// {name}
 ///
-/// Consumer: {consumer}
+/// Consumer: {consumer_req}
 ///
-/// Token: {token}
+/// Token: {token_req}
 ///
 /// Scopes: {scopes:?}
 ///
@@ -173,8 +142,7 @@ pub struct {pascal_case_name}Output {{
 pub async fn {snake_case_name}(
     consumer_key: {consumer_key_type},
     token: {token_type},
-{arguments}
-) -> {pascal_case_name}Output {{
+{arguments}) -> {output_struct_name} {{
     let callback = callback.unwrap_or(\"oob\".into());
     let url = UsosUri::with_path(\"{name}\");
     let authorization = authorize(
@@ -205,31 +173,32 @@ pub async fn {snake_case_name}(
 }
 
 fn generate_arguments(args: &[Argument]) -> String {
-    let mut res = args.into_iter().fold("".to_string(), |mut acc, arg| {
-        // Should we include deprecated arguments?
-        let _is_deprecated = arg.is_deprecated;
-
-        let arg_name = &*arg.name;
-        let is_required = arg.is_required;
-
-        let returned_type = if is_required {
-            "(return type)"
-        } else {
-            "Option<(return type)>"
-        };
-
-        acc.push_str(&format!("\t{arg_name}: {returned_type},\n"));
+    args.into_iter().fold("".to_string(), |mut acc, arg| {
+        acc.push_str(&generate_argument(arg));
         acc
-    });
+    })
+}
 
-    res.pop();
-    res
+fn generate_argument(arg: &Argument) -> String {
+    // Should we include deprecated arguments?
+    let _is_deprecated = arg.is_deprecated;
+
+    let arg_name = &*arg.name;
+    let is_required = arg.is_required;
+
+    let arg_type = if is_required {
+        PLACEHOLDER_TYPE.into()
+    } else {
+        option(PLACEHOLDER_TYPE)
+    };
+
+    format!("\t{arg_name}: {arg_type},\n")
 }
 
 fn generate_output_struct_fields(fields: &[Field]) -> String {
     let mut res = fields.into_iter().fold("".to_string(), |mut acc, field| {
         let field_name = &*field.name;
-        let returned_type = "(return type)";
+        let returned_type = PLACEHOLDER_TYPE;
 
         acc.push_str(&format!("\t{field_name}: {returned_type},\n"));
         acc
@@ -237,4 +206,18 @@ fn generate_output_struct_fields(fields: &[Field]) -> String {
 
     res.pop();
     res
+}
+
+fn option(inner: impl AsRef<str>) -> String {
+    format!("Option<{}>", inner.as_ref())
+}
+
+fn with_requirement(type_name: impl AsRef<str>, requirement: SignatureRequirement) -> String {
+    let type_name = type_name.as_ref();
+
+    match requirement {
+        SignatureRequirement::Ignored => "".to_string(),
+        SignatureRequirement::Optional => option(type_name),
+        SignatureRequirement::Required => type_name.to_string(),
+    }
 }
