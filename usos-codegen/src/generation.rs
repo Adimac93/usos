@@ -1,10 +1,12 @@
 use std::{
+    fmt::Display,
     path::{Path, PathBuf},
     time::Duration,
 };
 
 use anyhow::Context;
 use reqwest::Client;
+use serde::Deserialize;
 use serde_json::Value;
 use tokio::{fs::create_dir_all, io::AsyncWriteExt};
 
@@ -12,6 +14,7 @@ use crate::{
     cli::GenerationOptions,
     errors::AppError,
     module_system::{ModuleItem, ModuleItemKind, ModuleItems},
+    reference::{Argument, Field, MethodReference, SignatureRequirement},
     UsosUri,
 };
 
@@ -33,22 +36,24 @@ impl OutputDirectory {
 
 pub async fn generate(client: &Client, options: GenerationOptions) -> Result<(), AppError> {
     for item in options.module_tree_items {
-        generate_module_item(client, item).await?;
+        traverse_module_item(client, item).await?;
     }
 
     Ok(())
 }
 
 #[async_recursion::async_recursion]
-pub async fn generate_module_item(client: &Client, item: ModuleItem) -> Result<(), AppError> {
+pub async fn traverse_module_item(client: &Client, item: ModuleItem) -> Result<(), AppError> {
     match item.kind {
-        ModuleItemKind::Endpoint => generate_endpoint(client, item.name).await?,
+        ModuleItemKind::Endpoint => {
+            generate_endpoint(client, item.name).await?;
+            tokio::time::sleep(REQUEST_DELAY).await;
+        }
         ModuleItemKind::Module => {
             let nested_items = ModuleItems::get_from_usos(client, item.name).await?;
 
             for elem in nested_items.into_inner() {
-                tokio::time::sleep(REQUEST_DELAY).await;
-                generate_module_item(client, elem).await?;
+                traverse_module_item(client, elem).await?;
             }
         }
     };
@@ -61,7 +66,7 @@ pub async fn generate_endpoint(
     endpoint_path: impl AsRef<str>,
 ) -> Result<(), AppError> {
     let endpoint_path = endpoint_path.as_ref();
-    let docs: Value = get_usos_endpoint_docs(client, endpoint_path).await?;
+    let docs = get_usos_endpoint_docs(client, endpoint_path).await?;
 
     let output_file_path = OutputDirectory::from_endpoint_path(endpoint_path);
 
@@ -77,7 +82,7 @@ pub async fn generate_endpoint(
         .await
         .context("Failed to create file")?;
 
-    let output = into_code(docs).await?;
+    let output = into_code(docs)?;
 
     file.write(output.as_bytes())
         .await
@@ -86,10 +91,10 @@ pub async fn generate_endpoint(
     Ok(())
 }
 
-pub async fn get_usos_endpoint_docs(
+async fn get_usos_endpoint_docs(
     client: &Client,
     path: impl AsRef<str>,
-) -> Result<Value, AppError> {
+) -> Result<MethodReference, AppError> {
     Ok(client
         .get(UsosUri::with_path("services/apiref/method"))
         .query(&[("name", path.as_ref())])
@@ -99,18 +104,16 @@ pub async fn get_usos_endpoint_docs(
         .await?)
 }
 
-pub async fn into_code(docs: Value) -> Result<String, AppError> {
-    let docs = docs.as_object().unwrap();
+fn into_code(docs: MethodReference) -> Result<String, AppError> {
+    let name = docs.name;
+    let auth_options = docs.auth_options;
+    let arguments = docs.arguments;
+    let fields = docs.result_fields;
 
-    let name = docs.get("name").unwrap().as_str().unwrap();
-    let auth_options = docs.get("auth_options").unwrap().as_object().unwrap();
-    let arguments = docs.get("arguments").unwrap().as_array().unwrap();
-    let fields = docs.get("result_fields").unwrap().as_array().unwrap();
-
-    let consumer = auth_options.get("consumer").unwrap().as_str().unwrap();
-    let scopes = auth_options.get("scopes").unwrap().as_array().unwrap();
-    let token = auth_options.get("token").unwrap().as_str().unwrap();
-    let ssl_required = auth_options.get("ssl_required").unwrap().as_bool().unwrap();
+    let consumer = auth_options.consumer;
+    let scopes = auth_options.scopes;
+    let token = auth_options.token;
+    let ssl_required = auth_options.ssl_required;
 
     println!("name: {name}");
     println!("consumer: {consumer}");
@@ -136,20 +139,21 @@ pub async fn into_code(docs: Value) -> Result<String, AppError> {
         acc
     });
 
-    let consumer_key_type = if consumer == "required" {
+    // TODO: if ignored, don't write the argument.
+    let consumer_key_type = if consumer == SignatureRequirement::Required {
         "&ConsumerKey"
     } else {
         "Option<&ConsumerKey>"
     };
 
-    let token_type = if token == "required" {
+    let token_type = if token == SignatureRequirement::Required {
         "AccessToken"
     } else {
         "Option<AccessToken>"
     };
 
-    let arguments = generate_arguments(arguments);
-    let output_fields = generate_output_struct_fields(fields);
+    let arguments = generate_arguments(&arguments);
+    let output_fields = generate_output_struct_fields(&fields);
 
     let res = format!(
         "#[derive(Deserialize)]
@@ -200,15 +204,13 @@ pub async fn {snake_case_name}(
     Ok(res)
 }
 
-fn generate_arguments(args: &[Value]) -> String {
-    let mut res = args.into_iter().fold("".to_string(), |mut acc, val| {
-        let arg_data = val.as_object().unwrap();
-
+fn generate_arguments(args: &[Argument]) -> String {
+    let mut res = args.into_iter().fold("".to_string(), |mut acc, arg| {
         // Should we include deprecated arguments?
-        let _is_deprecated = arg_data.get("is_deprecated").unwrap().as_bool().unwrap();
+        let _is_deprecated = arg.is_deprecated;
 
-        let arg_name = arg_data.get("name").unwrap().as_str().unwrap();
-        let is_required = arg_data.get("is_required").unwrap().as_bool().unwrap();
+        let arg_name = &*arg.name;
+        let is_required = arg.is_required;
 
         let returned_type = if is_required {
             "(return type)"
@@ -224,11 +226,9 @@ fn generate_arguments(args: &[Value]) -> String {
     res
 }
 
-fn generate_output_struct_fields(fields: &[Value]) -> String {
-    let mut res = fields.into_iter().fold("".to_string(), |mut acc, val| {
-        let field_data = val.as_object().unwrap();
-
-        let field_name = field_data.get("name").unwrap().as_str().unwrap();
+fn generate_output_struct_fields(fields: &[Field]) -> String {
+    let mut res = fields.into_iter().fold("".to_string(), |mut acc, field| {
+        let field_name = &*field.name;
         let returned_type = "(return type)";
 
         acc.push_str(&format!("\t{field_name}: {returned_type},\n"));

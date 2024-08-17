@@ -8,6 +8,7 @@ pub mod cli;
 pub mod errors;
 pub mod generation;
 pub mod module_system;
+pub mod reference;
 
 struct UsosUri;
 
