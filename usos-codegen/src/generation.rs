@@ -10,7 +10,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::{
-    fs::{create_dir, create_dir_all, OpenOptions},
+    fs::{create_dir, create_dir_all, File, OpenOptions},
     io::{AsyncReadExt, AsyncWriteExt},
 };
 
@@ -30,72 +30,60 @@ struct OutputDirectory;
 impl OutputDirectory {
     const BASE: &'static str = "result";
 
-    pub fn base() -> PathBuf {
-        PathBuf::new().join(Self::BASE)
-    }
-
-    pub fn file_from_endpoint_path(path: impl Into<String>) -> PathBuf {
+    /// Functions as both module and endpoint file
+    pub fn module_file(path: impl Into<String>) -> PathBuf {
         PathBuf::from(format!("{}/{}.rs", Self::BASE, path.into()))
     }
 
-    pub fn dir_from_endpoint_path(path: impl Into<String>) -> PathBuf {
+    pub fn module_dir(path: impl Into<String>) -> PathBuf {
         PathBuf::from(format!("{}/{}", Self::BASE, path.into()))
     }
 }
 
 pub async fn generate(client: &Client, items: Vec<ModuleItem>) -> Result<(), AppError> {
     for item in items {
-        // if suitable directory does not exist
-        // append to ./result/services.rs file
-        // add pub mod apiref;
-        // create directory ./result/services
+        traverse_above(&*item.name).await?;
+        traverse_below(client, item).await?;
+    }
 
-        // repeat for each path of 2 and more:
-        // services/apiref
+    Ok(())
+}
 
-        let path: &Path = item.name.as_ref();
-        let mut ancestors: Vec<&Path> = path.ancestors().collect();
-        ancestors.reverse();
-        println!("{ancestors:?}");
-        for elem in (2..ancestors.len()).map(|i| ancestors[i].to_str().unwrap()) {
-            println!("{elem}");
-            let (module, written) = elem.rsplit_once('/').unwrap();
-
-            try_write_module_file(module, written).await?;
-            create_dir_all(OutputDirectory::dir_from_endpoint_path(module))
+async fn traverse_above(node: impl AsRef<str>) -> Result<(), AppError> {
+    let mut acc = "".to_string();
+    for written in node.as_ref().split('/') {
+        if !acc.is_empty() {
+            try_write_module_file(acc.as_str(), written).await?;
+            create_dir_all(OutputDirectory::module_dir(acc.as_str()))
                 .await
                 .context("Failed to create directory")?;
+            acc.push('/');
         }
 
-        traverse_module_item(client, item).await?;
+        acc.push_str(written);
     }
 
     Ok(())
 }
 
 #[async_recursion::async_recursion]
-pub async fn traverse_module_item(client: &Client, item: ModuleItem) -> Result<(), AppError> {
-    match item.kind {
+pub async fn traverse_below(client: &Client, node: ModuleItem) -> Result<(), AppError> {
+    match node.kind {
         ModuleItemKind::Endpoint => {
-            generate_endpoint_file(client, item.name).await?;
+            generate_endpoint_file(client, node.name).await?;
             tokio::time::sleep(REQUEST_DELAY).await;
         }
         ModuleItemKind::Module => {
-            // if starting from services/apiref:
-            // append to ./result/services/apiref.rs file
-            // for every submodule:
-            // if suitable directory does not exist
-            // add pub mod {submodule_name};
-            // create directory ./services/apiref/{submodule_name}
-            // and recurse.
-
-            let nested_items = ModuleItems::get_from_usos(client, &*item.name).await?;
+            let nested_items = ModuleItems::get_from_usos(client, &*node.name).await?;
 
             for elem in nested_items.into_inner() {
-                let written_submodule = elem.name.rsplit_once('/').unwrap().1;
-                try_write_module_file(&*item.name, written_submodule).await?;
+                let written_submodule = elem.name.rsplit_once('/');
+                debug_assert!(written_submodule.is_some());
+                let (_rest_of_path, written_submodule) = written_submodule.unwrap();
 
-                traverse_module_item(client, elem).await?;
+                try_write_module_file(&*node.name, written_submodule).await?;
+
+                traverse_below(client, elem).await?;
             }
         }
     };
@@ -107,15 +95,10 @@ pub async fn try_write_module_file(
     module_path: impl AsRef<str>,
     written: impl AsRef<str>,
 ) -> Result<(), AppError> {
-    let module_path = module_path.as_ref();
-    let written = written.as_ref();
-    let target_dir = OutputDirectory::file_from_endpoint_path(module_path);
+    let (module_path, written) = (module_path.as_ref(), written.as_ref());
+    let target_dir = OutputDirectory::module_file(module_path);
 
-    let mut file = OpenOptions::new()
-        .append(true)
-        .read(true)
-        .create(true)
-        .open(target_dir)
+    let mut file = open_module_file(target_dir)
         .await
         .context("Failed to create file")?;
 
@@ -125,14 +108,22 @@ pub async fn try_write_module_file(
         .context("Failed to read from file")?;
 
     let content_to_write = format!("pub mod {written};\n");
-
     if !buf.contains(content_to_write.as_str()) {
-        file.write_all(format!("pub mod {written};\n").as_bytes())
+        file.write_all(content_to_write.as_bytes())
             .await
             .context("Failed to write to file")?;
     }
 
     Ok(())
+}
+
+async fn open_module_file(path: impl AsRef<Path>) -> Result<File, tokio::io::Error> {
+    Ok(OpenOptions::new()
+        .append(true)
+        .read(true)
+        .create(true)
+        .open(path.as_ref())
+        .await?)
 }
 
 pub async fn generate_endpoint_file(
@@ -142,7 +133,7 @@ pub async fn generate_endpoint_file(
     let endpoint_path = endpoint_path.as_ref();
     let docs = get_usos_endpoint_docs(client, endpoint_path).await?;
 
-    let output_file_path = OutputDirectory::file_from_endpoint_path(endpoint_path);
+    let output_file_path = OutputDirectory::module_file(endpoint_path);
 
     create_dir_all(
         output_file_path
