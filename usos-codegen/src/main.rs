@@ -1,8 +1,6 @@
+use crate::generation::generate;
 use cli::prompt_cli;
-use errors::AppError;
-use generation::generate;
 use reqwest::Client;
-use serde_json::Value;
 
 pub mod cli;
 pub mod errors;
