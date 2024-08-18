@@ -9,7 +9,10 @@ use heck::{ToPascalCase, ToSnakeCase};
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
-use tokio::{fs::create_dir_all, io::AsyncWriteExt};
+use tokio::{
+    fs::{create_dir, create_dir_all, OpenOptions},
+    io::{AsyncReadExt, AsyncWriteExt},
+};
 
 use crate::{
     errors::AppError,
@@ -31,13 +34,39 @@ impl OutputDirectory {
         PathBuf::new().join(Self::BASE)
     }
 
-    pub fn from_endpoint_path(path: impl Into<String>) -> PathBuf {
+    pub fn file_from_endpoint_path(path: impl Into<String>) -> PathBuf {
         PathBuf::from(format!("{}/{}.rs", Self::BASE, path.into()))
+    }
+
+    pub fn dir_from_endpoint_path(path: impl Into<String>) -> PathBuf {
+        PathBuf::from(format!("{}/{}", Self::BASE, path.into()))
     }
 }
 
 pub async fn generate(client: &Client, items: Vec<ModuleItem>) -> Result<(), AppError> {
     for item in items {
+        // if suitable directory does not exist
+        // append to ./result/services.rs file
+        // add pub mod apiref;
+        // create directory ./result/services
+
+        // repeat for each path of 2 and more:
+        // services/apiref
+
+        let path: &Path = item.name.as_ref();
+        let mut ancestors: Vec<&Path> = path.ancestors().collect();
+        ancestors.reverse();
+        println!("{ancestors:?}");
+        for elem in (2..ancestors.len()).map(|i| ancestors[i].to_str().unwrap()) {
+            println!("{elem}");
+            let (module, written) = elem.rsplit_once('/').unwrap();
+
+            try_write_module_file(module, written).await?;
+            create_dir_all(OutputDirectory::dir_from_endpoint_path(module))
+                .await
+                .context("Failed to create directory")?;
+        }
+
         traverse_module_item(client, item).await?;
     }
 
@@ -52,13 +81,56 @@ pub async fn traverse_module_item(client: &Client, item: ModuleItem) -> Result<(
             tokio::time::sleep(REQUEST_DELAY).await;
         }
         ModuleItemKind::Module => {
-            let nested_items = ModuleItems::get_from_usos(client, item.name).await?;
+            // if starting from services/apiref:
+            // append to ./result/services/apiref.rs file
+            // for every submodule:
+            // if suitable directory does not exist
+            // add pub mod {submodule_name};
+            // create directory ./services/apiref/{submodule_name}
+            // and recurse.
+
+            let nested_items = ModuleItems::get_from_usos(client, &*item.name).await?;
 
             for elem in nested_items.into_inner() {
+                let written_submodule = elem.name.rsplit_once('/').unwrap().1;
+                try_write_module_file(&*item.name, written_submodule).await?;
+
                 traverse_module_item(client, elem).await?;
             }
         }
     };
+
+    Ok(())
+}
+
+pub async fn try_write_module_file(
+    module_path: impl AsRef<str>,
+    written: impl AsRef<str>,
+) -> Result<(), AppError> {
+    let module_path = module_path.as_ref();
+    let written = written.as_ref();
+    let target_dir = OutputDirectory::file_from_endpoint_path(module_path);
+
+    let mut file = OpenOptions::new()
+        .append(true)
+        .read(true)
+        .create(true)
+        .open(target_dir)
+        .await
+        .context("Failed to create file")?;
+
+    let mut buf = String::new();
+    file.read_to_string(&mut buf)
+        .await
+        .context("Failed to read from file")?;
+
+    let content_to_write = format!("pub mod {written};\n");
+
+    if !buf.contains(content_to_write.as_str()) {
+        file.write_all(format!("pub mod {written};\n").as_bytes())
+            .await
+            .context("Failed to write to file")?;
+    }
 
     Ok(())
 }
@@ -70,7 +142,7 @@ pub async fn generate_endpoint_file(
     let endpoint_path = endpoint_path.as_ref();
     let docs = get_usos_endpoint_docs(client, endpoint_path).await?;
 
-    let output_file_path = OutputDirectory::from_endpoint_path(endpoint_path);
+    let output_file_path = OutputDirectory::file_from_endpoint_path(endpoint_path);
 
     create_dir_all(
         output_file_path
