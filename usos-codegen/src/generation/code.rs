@@ -19,10 +19,6 @@ impl Code {
         Code { items: Vec::new() }
     }
 
-    pub fn inner_mut(&mut self) -> &mut Vec<CodegenItem> {
-        &mut self.items
-    }
-
     pub fn line(mut self, s: impl Into<String>) -> Self {
         self.items.push(CodegenItem::line(s));
         self

@@ -75,7 +75,7 @@ pub(crate) async fn traverse_below(client: &Client, node: ModuleItem) -> Result<
     Ok(())
 }
 
-pub async fn try_write_module_file(
+async fn try_write_module_file(
     module_path: impl AsRef<str>,
     written: impl AsRef<str>,
 ) -> Result<(), AppError> {
@@ -110,7 +110,7 @@ async fn open_module_file(path: impl AsRef<Path>) -> Result<File, tokio::io::Err
         .await?)
 }
 
-pub async fn generate_endpoint_file(
+pub(super) async fn generate_endpoint_file(
     client: &Client,
     endpoint_path: impl AsRef<str>,
 ) -> Result<(), AppError> {
