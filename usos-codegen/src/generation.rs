@@ -124,76 +124,110 @@ fn into_code(docs: MethodReference) -> Result<String, AppError> {
     let other_arguments = generate_arguments(&docs.arguments);
     let output_fields = generate_output_struct_fields(&docs.result_fields);
 
-    let authorize_import_lines = if consumer_req == SignatureRequirement::Ignored {
-        ""
-    } else {
-        "use crate::api::oauth1::authorize;\nuse crate::keys::ConsumerKey;\nuse std::collections::HashMap;\n\n"
-    };
+    // TODO: handle params
+    let mut res = Code::new();
 
-    let authorize_lines = if consumer_req == SignatureRequirement::Ignored {
-        ""
-    } else {
-        "\tlet authorization = authorize(
-        \"POST\",
-        &url,
-        consumer_key,
-        None,
-        Some(HashMap::from([
-            (\"oauth_callback\".into(), callback.clone()),
-        ])),
-    );\n"
-    };
+    if consumer_req != SignatureRequirement::Ignored {
+        res = res
+            .line("use crate::api::oauth1::authorize;")
+            .line("use crate::keys::ConsumerKey;")
+            .line("use std::collections::HashMap;")
+    }
 
-    let authorize_form_line = if consumer_req == SignatureRequirement::Ignored {
-        ""
-    } else {
-        "\t\t.form(&authorization)\n"
-    };
+    res = res
+        .line("use crate::{")
+        .indent()
+        .line("client::{UsosUri, CLIENT},")
+        .line("util::ToAppResult,")
+        .stop_indent()
+        .line("};")
+        .line("use serde::Deserialize;")
+        .line("")
+        .line("#[derive(Deserialize)]")
+        .line(format!("pub struct {output_struct_name} {{"))
+        .indent()
+        .merge(output_fields)
+        .stop_indent()
+        .line("}")
+        .line("")
+        .line(format!("/// {name}"))
+        .line("///")
+        .line(format!("/// Consumer: {consumer_req}"))
+        .line("///")
+        .line(format!("/// Token: {token_req}"))
+        .line("///")
+        .line(format!("/// Scopes: {scopes:?}"))
+        .line("///")
+        .line(format!("/// SSL: {ssl_required}"))
+        .line(format!("pub async fn {snake_case_name} ("))
+        .indent();
 
-    let res = format!(
-        "{authorize_import_lines}use crate::{{
-    client::{{UsosUri, CLIENT}},
-    util::ToAppResult,
-}};
-use serde::Deserialize;
+    if consumer_req != SignatureRequirement::Ignored {
+        res = res.line(consumer_arg_line);
+    }
 
-#[derive(Deserialize)]
-pub struct {output_struct_name} {{
-{output_fields}
-}}
+    if token_req != SignatureRequirement::Ignored {
+        res = res.line(token_arg_line);
+    }
 
-/// {name}
-///
-/// Consumer: {consumer_req}
-///
-/// Token: {token_req}
-///
-/// Scopes: {scopes:?}
-///
-/// SSL: {ssl_required}
-pub async fn {snake_case_name}(
-{consumer_arg_line}{token_arg_line}{other_arguments}) -> crate::Result<{output_struct_name}> {{
-    let url = UsosUri::with_path(\"{name}\");
-{authorize_lines}
-    let body = CLIENT
-        .post(&url)
-{authorize_form_line}\t\t.send()
-        .await?
-        .to_app_result()
-        .await?
-        .json()
-        .await?;
+    res = res
+        .merge(other_arguments)
+        .stop_indent()
+        .line(format!(") -> crate::Result<{output_struct_name}> {{"))
+        .indent()
+        .line(format!("let url = UsosUri::with_path(\"{name}\");"));
 
-    Ok(body)
-}}",
-    );
+    if consumer_req != SignatureRequirement::Ignored {
+        let consumer_key_line = if consumer_req == SignatureRequirement::Optional {
+            "consumer_key.unwrap(),"
+        } else {
+            "consumer_key,"
+        };
 
-    Ok(res)
+        res = res
+            .line("")
+            .line("let authorization = authorize(")
+            .indent()
+            .line("\"POST\",")
+            .line("&url,")
+            .line(consumer_key_line)
+            .line("None,")
+            .line("Some(HashMap::from([")
+            .indent()
+            .line("(\"oauth_callback\".into(), callback.clone()),")
+            .stop_indent()
+            .line("])),")
+            .stop_indent()
+            .line(")")
+            .line("");
+    }
+
+    res = res.line("let body = CLIENT").indent().line(".post(&url)");
+
+    if consumer_req != SignatureRequirement::Ignored {
+        res = res.line(".form(&authorization)");
+    }
+
+    res = res
+        .line(".send()")
+        .line(".await?")
+        .line(".to_app_result()")
+        .line(".await?")
+        .line(".json()")
+        .line(".await?;")
+        .stop_indent()
+        .line("Ok(body)")
+        .stop_indent()
+        .line("}");
+
+    Ok(res.to_code_string())
 }
 
-fn generate_arguments(args: &[Argument]) -> String {
-    args.into_iter().fold("".to_string(), |mut acc, arg| {
-        acc.push_str(&generate_argument(arg));
+fn generate_arguments(args: &[Argument]) -> Code {
+    args.into_iter().fold(Code::new(), |mut acc, arg| {
+        if !OMITTED_ARG_NAMES.contains(&&*arg.name) {
+            acc = acc.line(&generate_argument(arg));
+        }
         acc
     })
 }
@@ -202,10 +236,6 @@ fn generate_argument(arg: &Argument) -> String {
     // Should we include deprecated arguments?
     let _is_deprecated = arg.is_deprecated;
 
-    if OMITTED_ARG_NAMES.contains(&&*arg.name) {
-        return "".into();
-    }
-
     if arg.is_required {
         ArgLine::required(&*arg.name, PLACEHOLDER_TYPE)
     } else {
@@ -213,17 +243,13 @@ fn generate_argument(arg: &Argument) -> String {
     }
 }
 
-fn generate_output_struct_fields(fields: &[Field]) -> String {
-    let mut res = fields.into_iter().fold("".to_string(), |mut acc, field| {
+fn generate_output_struct_fields(fields: &[Field]) -> Code {
+    fields.into_iter().fold(Code::new(), |acc, field| {
         let field_name = &*field.name;
         let returned_type = PLACEHOLDER_TYPE;
 
-        acc.push_str(&format!("\t{field_name}: {returned_type},\n"));
-        acc
-    });
-
-    res.pop();
-    res
+        acc.line(&format!("{field_name}: {returned_type},"))
+    })
 }
 
 fn option(inner: impl AsRef<str>) -> String {
@@ -234,11 +260,11 @@ struct ArgLine;
 
 impl ArgLine {
     fn optional(arg_name: impl AsRef<str>, arg_type: impl AsRef<str>) -> String {
-        format!("\t{}: {},\n", arg_name.as_ref(), option(arg_type.as_ref()))
+        format!("{}: {},", arg_name.as_ref(), option(arg_type.as_ref()))
     }
 
     fn required(arg_name: impl AsRef<str>, arg_type: impl AsRef<str>) -> String {
-        format!("\t{}: {},\n", arg_name.as_ref(), arg_type.as_ref())
+        format!("{}: {},", arg_name.as_ref(), arg_type.as_ref())
     }
 
     fn with_requirement(
@@ -253,5 +279,136 @@ impl ArgLine {
             SignatureRequirement::Optional => ArgLine::optional(arg_name, arg_type),
             SignatureRequirement::Required => ArgLine::required(arg_name, arg_type),
         }
+    }
+}
+
+pub(crate) enum CodegenItem {
+    Line(String),
+    Indent,
+    StopIndent,
+}
+
+impl CodegenItem {
+    pub(crate) fn line(s: impl Into<String>) -> Self {
+        Self::Line(s.into())
+    }
+}
+
+pub(crate) struct Code {
+    items: Vec<CodegenItem>,
+}
+
+impl Code {
+    pub fn new() -> Self {
+        Code { items: Vec::new() }
+    }
+
+    pub fn inner_mut(&mut self) -> &mut Vec<CodegenItem> {
+        &mut self.items
+    }
+
+    pub fn line(mut self, s: impl Into<String>) -> Self {
+        self.items.push(CodegenItem::line(s));
+        self
+    }
+
+    pub fn indent(mut self) -> Self {
+        self.items.push(CodegenItem::Indent);
+        self
+    }
+
+    pub fn stop_indent(mut self) -> Self {
+        self.items.push(CodegenItem::StopIndent);
+        self
+    }
+
+    pub fn merge(mut self, other: Self) -> Self {
+        self.extend(other.items);
+        self
+    }
+
+    /// Panics if indent count goes negative.
+    pub fn to_code_string(self) -> String {
+        let mut tab_count = 0;
+        self.items
+            .into_iter()
+            .fold(String::new(), |mut acc, item| match item {
+                CodegenItem::Indent => {
+                    tab_count += 1;
+                    acc
+                }
+                CodegenItem::StopIndent => {
+                    if tab_count == 0 {
+                        panic!("Indent count is negative");
+                    }
+                    tab_count -= 1;
+                    acc
+                }
+                CodegenItem::Line(line) => {
+                    let tabs = "\t".repeat(tab_count);
+                    acc.push_str(&format!("{tabs}{line}\n"));
+                    acc
+                }
+            })
+    }
+}
+
+impl Extend<CodegenItem> for Code {
+    fn extend<T: IntoIterator<Item = CodegenItem>>(&mut self, iter: T) {
+        self.items.extend(iter);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn code_struct_to_code_gives_coorect_result() {
+        let mut code = Code::new();
+        code.extend(vec![
+            CodegenItem::line("fn foo() -> i32 {"),
+            CodegenItem::Indent,
+            CodegenItem::line("5"),
+            CodegenItem::StopIndent,
+            CodegenItem::line("}"),
+        ]);
+
+        assert_eq!(code.to_code_string(), "fn foo() -> i32 {\n\t5\n}\n");
+    }
+
+    #[test]
+    fn code_struct_high_level_api_gives_correct_result() {
+        let code = Code::new()
+            .line("fn foo() -> i32 {")
+            .indent()
+            .line("5")
+            .stop_indent()
+            .line("}");
+
+        assert_eq!(code.to_code_string(), "fn foo() -> i32 {\n\t5\n}\n");
+    }
+
+    #[test]
+    fn code_struct_nested_gives_correct_result() {
+        let struct_code = Code::new()
+            .line("struct Foo {")
+            .indent()
+            .line("first: String,")
+            .line("second: i32,")
+            .stop_indent()
+            .line("}");
+
+        let code = Code::new()
+            .line("fn foo() {")
+            .indent()
+            .merge(struct_code)
+            .stop_indent()
+            .line("}");
+
+        assert_eq!(
+            code.to_code_string(),
+            "fn foo() {\n\tstruct Foo {\n\t\tfirst: String,\n\t\tsecond: i32,\n\t}\n}\n"
+        )
     }
 }
