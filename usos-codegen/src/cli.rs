@@ -11,7 +11,6 @@ use crate::{
 
 pub async fn prompt_cli(client: &Client) -> Result<Vec<ModuleItem>, AppError> {
     let mut curr_module = "services".to_string();
-    let mut answers: Vec<ModuleItem>;
     let mut doing_specific_search = false;
     let mut last_answer_empty = false;
 
@@ -26,21 +25,19 @@ pub async fn prompt_cli(client: &Client) -> Result<Vec<ModuleItem>, AppError> {
 
         let options = ModuleItems::get_from_usos(client, &curr_module).await?;
 
-        answers = MultiSelect::new(prompt, options.into_inner()).prompt()?;
+        let mut answers = MultiSelect::new(prompt, options.into_inner()).prompt()?;
 
         last_answer_empty = answers.is_empty();
         if answers.len() > 1 {
-            break;
+            return Ok(answers);
         } else if answers.len() == 1 {
             let only_answer = answers.pop().unwrap();
             if only_answer.kind == ModuleItemKind::Module {
                 doing_specific_search = true;
-                curr_module = only_answer.name;
+                curr_module = only_answer.api_path;
             } else {
-                break;
+                return Ok(answers);
             }
         }
     }
-
-    Ok(answers)
 }

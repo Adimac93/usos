@@ -25,28 +25,28 @@ impl Display for ModuleItemKind {
 #[derive(Debug)]
 pub struct ModuleItem {
     pub kind: ModuleItemKind,
-    pub name: String,
+    pub api_path: String,
 }
 
 impl ModuleItem {
     pub fn module(name: impl Into<String>) -> Self {
         Self {
             kind: ModuleItemKind::Module,
-            name: name.into(),
+            api_path: name.into(),
         }
     }
 
     pub fn endpoint(name: impl Into<String>) -> Self {
         Self {
             kind: ModuleItemKind::Endpoint,
-            name: name.into(),
+            api_path: name.into(),
         }
     }
 }
 
 impl Display for ModuleItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.kind, self.name)
+        write!(f, "{}: {}", self.kind, self.api_path)
     }
 }
 

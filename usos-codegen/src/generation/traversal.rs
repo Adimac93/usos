@@ -54,18 +54,18 @@ pub(crate) async fn traverse_above(node: impl AsRef<str>) -> Result<(), AppError
 pub(crate) async fn traverse_below(client: &Client, node: ModuleItem) -> Result<(), AppError> {
     match node.kind {
         ModuleItemKind::Endpoint => {
-            generate_endpoint_file(client, node.name).await?;
+            generate_endpoint_file(client, node.api_path).await?;
             tokio::time::sleep(REQUEST_DELAY).await;
         }
         ModuleItemKind::Module => {
-            let nested_items = ModuleItems::get_from_usos(client, &*node.name).await?;
+            let nested_items = ModuleItems::get_from_usos(client, &*node.api_path).await?;
 
             for elem in nested_items.into_inner() {
-                let written_submodule = elem.name.rsplit_once('/');
+                let written_submodule = elem.api_path.rsplit_once('/');
                 debug_assert!(written_submodule.is_some());
                 let (_rest_of_path, written_submodule) = written_submodule.unwrap();
 
-                try_write_module_file(&*node.name, written_submodule).await?;
+                try_write_module_file(&*node.api_path, written_submodule).await?;
 
                 traverse_below(client, elem).await?;
             }
