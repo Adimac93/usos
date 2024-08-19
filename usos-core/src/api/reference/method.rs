@@ -14,8 +14,9 @@ use crate::{api::scopes::Scope, client::CLIENT};
 pub async fn get_method_info(method_name: &str) -> MethodReference {
     let response = CLIENT
         .get(format!(
-            "https://apps.usos.pwr.edu.pl/services/apiref/method?name={method_name}"
+            "https://apps.usos.pwr.edu.pl/services/apiref/method"
         ))
+        .query(&[("name", method_name)])
         .send()
         .await
         .unwrap();
