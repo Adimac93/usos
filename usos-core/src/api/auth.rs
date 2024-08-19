@@ -7,10 +7,7 @@ use anyhow::Context;
 use secrecy::SecretString;
 
 use crate::{
-    api::{
-        oauth1::{authorize, KeyPair},
-        scopes::Scope,
-    },
+    api::{oauth1::authorize, scopes::Scope},
     client::{UsosUri, CLIENT},
     errors::AppError,
     keys::ConsumerKey,
@@ -24,9 +21,9 @@ pub struct OAuthRequestToken {
     secret: SecretString,
 }
 
-pub struct OAuthAccessToken {
-    token: String,
-    secret: SecretString,
+pub struct AccessToken {
+    pub token: String,
+    pub secret: SecretString,
 }
 
 pub async fn acquire_request_token(
@@ -77,7 +74,7 @@ pub async fn acquire_access_token(
     consumer_key: &ConsumerKey,
     request_token: OAuthRequestToken,
     verifier: impl Into<String>,
-) -> crate::Result<OAuthAccessToken> {
+) -> crate::Result<AccessToken> {
     let url = UsosUri::with_path("/services/oauth/access_token");
     let body = CLIENT
         .post(&url)
@@ -85,10 +82,10 @@ pub async fn acquire_access_token(
             "POST",
             &url,
             consumer_key,
-            Some(&KeyPair::new(
-                request_token.token.into(),
-                request_token.secret,
-            )),
+            Some(&AccessToken {
+                token: request_token.token,
+                secret: request_token.secret,
+            }),
             Some(HashMap::from([("oauth_verifier".into(), verifier.into())])),
         ))
         .process()
@@ -108,7 +105,7 @@ pub async fn acquire_access_token(
     println!("Access token: {oauth_token}");
     println!("Access token secret: {oauth_token_secret}");
 
-    return Ok(OAuthAccessToken {
+    return Ok(AccessToken {
         token: oauth_token.into(),
         secret: oauth_token_secret.into(),
     });
@@ -133,7 +130,7 @@ async fn get_pin(oauth_token: String) -> String {
 }
 
 #[cfg(test)]
-pub async fn get_access_token(consumer_key: &ConsumerKey) -> Result<OAuthAccessToken, AppError> {
+pub async fn get_access_token(consumer_key: &ConsumerKey) -> Result<AccessToken, AppError> {
     let request_token = acquire_request_token(
         consumer_key,
         None,

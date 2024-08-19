@@ -10,17 +10,7 @@ const NONCE_LENGTH: usize = 32;
 const OAUTH_VERSION: &str = "1.0";
 use crate::keys::ConsumerKey;
 
-#[derive(Clone, Debug)]
-pub struct KeyPair {
-    pub key: String,
-    pub secret: SecretString,
-}
-
-impl KeyPair {
-    pub fn new(key: String, secret: SecretString) -> Self {
-        KeyPair { key, secret }
-    }
-}
+use super::auth::AccessToken;
 
 fn rand_alphanumeric_string(target_len: usize) -> String {
     Alphanumeric
@@ -34,7 +24,7 @@ pub fn authorize<'a>(
     method: &str,
     uri: &str,
     consumer: &ConsumerKey,
-    token: Option<&KeyPair>,
+    token: Option<&AccessToken>,
     params: Option<HashMap<String, String>>,
 ) -> HashMap<String, String> {
     let mut params = params.unwrap_or_else(HashMap::new);
@@ -48,7 +38,7 @@ pub fn authorize<'a>(
     params.insert("oauth_timestamp".into(), timestamp);
     params.insert("oauth_version".into(), OAUTH_VERSION.into());
     if let Some(tk) = token {
-        params.insert("oauth_token".into(), tk.key.as_str().into());
+        params.insert("oauth_token".into(), tk.token.as_str().into());
     }
 
     let signature = gen_signature(
