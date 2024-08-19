@@ -2,10 +2,15 @@ use anyhow::anyhow;
 use reqwest::StatusCode;
 use thiserror::Error;
 
+use crate::api::errors::UsosError;
+
 #[derive(Error, Debug)]
 pub enum AppError {
     #[error("Http error {code} - {message}")]
-    Http { code: StatusCode, message: String },
+    Http {
+        code: StatusCode,
+        message: UsosError,
+    },
     #[error("Response parsing failed: {0}")]
     Parse(String),
     #[error(transparent)]
@@ -13,11 +18,8 @@ pub enum AppError {
 }
 
 impl AppError {
-    pub fn http(code: StatusCode, message: impl Into<String>) -> Self {
-        Self::Http {
-            code,
-            message: message.into(),
-        }
+    pub fn http(code: StatusCode, message: UsosError) -> Self {
+        Self::Http { code, message }
     }
 
     pub fn parse(msg: impl Into<String>) -> Self {

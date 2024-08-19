@@ -1,23 +1,36 @@
 use std::collections::HashMap;
 
-use crate::errors::AppError;
+use reqwest::Response;
+use serde::de::DeserializeOwned;
 
-pub(crate) trait ToAppResult
+use crate::{api::errors::UsosError, errors::AppError};
+
+pub(crate) trait Process
 where
     Self: Sized,
 {
-    async fn to_app_result(self) -> crate::Result<Self>;
+    async fn process(self) -> crate::Result<Response>;
+    async fn process_as_json<T: DeserializeOwned>(self) -> crate::Result<T>;
 }
 
-impl ToAppResult for reqwest::Response {
-    async fn to_app_result(self) -> crate::Result<Self> {
-        let status = self.status();
+impl Process for reqwest::RequestBuilder {
+    async fn process(self) -> crate::Result<Response> {
+        let response = self.send().await?;
+
+        let status = response.status();
 
         if status.is_client_error() || status.is_server_error() {
-            return Err(AppError::http(status, self.text().await?));
+            let error: UsosError = response.json().await?;
+
+            Err(AppError::http(status, error))
         } else {
-            return Ok(self);
+            Ok(response)
         }
+    }
+
+    async fn process_as_json<T: DeserializeOwned>(self) -> crate::Result<T> {
+        let response = self.process().await?;
+        Ok(response.json().await?)
     }
 }
 

@@ -14,7 +14,7 @@ use crate::{
     client::{UsosUri, CLIENT},
     errors::AppError,
     keys::ConsumerKey,
-    util::{parse_ampersand_params, ToAppResult},
+    util::{parse_ampersand_params, Process},
 };
 
 use super::scopes::Scopes;
@@ -50,9 +50,7 @@ pub async fn acquire_request_token(
     let body = CLIENT
         .post(&url)
         .form(&authorization)
-        .send()
-        .await?
-        .to_app_result()
+        .process()
         .await?
         .text()
         .await?;
@@ -93,9 +91,7 @@ pub async fn acquire_access_token(
             )),
             Some(HashMap::from([("oauth_verifier".into(), verifier.into())])),
         ))
-        .send()
-        .await?
-        .to_app_result()
+        .process()
         .await?
         .text()
         .await?;
