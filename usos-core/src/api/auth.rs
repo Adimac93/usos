@@ -11,7 +11,7 @@ use crate::{
     client::{UsosUri, CLIENT},
     errors::AppError,
     keys::ConsumerKey,
-    util::{parse_ampersand_params, Process},
+    util::{parse_ampersand_params, Params, Process},
 };
 
 use super::scopes::Scopes;
@@ -33,20 +33,16 @@ pub async fn acquire_request_token(
 ) -> crate::Result<OAuthRequestToken> {
     let callback = callback.unwrap_or("oob".into());
     let url = UsosUri::with_path("/services/oauth/request_token");
-    let authorization = authorize(
-        "POST",
-        &url,
-        consumer_key,
-        None,
-        Some(HashMap::from([
-            ("oauth_callback".into(), callback.clone()),
-            ("scopes".into(), scopes.to_string()),
-        ])),
-    );
+
+    let params = Params::from(HashMap::from([
+        ("oauth_callback".into(), callback.clone()),
+        ("scopes".into(), scopes.to_string()),
+    ]))
+    .sign("POST", &url, Some(consumer_key), None);
 
     let body = CLIENT
         .post(&url)
-        .form(&authorization)
+        .form(&params)
         .process()
         .await?
         .text()
@@ -76,18 +72,20 @@ pub async fn acquire_access_token(
     verifier: impl Into<String>,
 ) -> crate::Result<AccessToken> {
     let url = UsosUri::with_path("/services/oauth/access_token");
+
+    let params = Params::from(HashMap::from([("oauth_verifier".into(), verifier.into())])).sign(
+        "POST",
+        &url,
+        Some(consumer_key),
+        Some(&AccessToken {
+            token: request_token.token,
+            secret: request_token.secret,
+        }),
+    );
+
     let body = CLIENT
         .post(&url)
-        .form(&authorize(
-            "POST",
-            &url,
-            consumer_key,
-            Some(&AccessToken {
-                token: request_token.token,
-                secret: request_token.secret,
-            }),
-            Some(HashMap::from([("oauth_verifier".into(), verifier.into())])),
-        ))
+        .form(&params)
         .process()
         .await?
         .text()
