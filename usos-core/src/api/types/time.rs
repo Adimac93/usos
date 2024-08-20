@@ -1,3 +1,6 @@
+use std::fmt::Display;
+
+use serde::{Deserialize, Serialize};
 use time::format_description::BorrowedFormatItem;
 use time::macros::format_description;
 
@@ -5,6 +8,69 @@ pub const DATE_FORMAT: &[BorrowedFormatItem<'_>] = format_description!("[year]-[
 pub const TIME_FORMAT: &[BorrowedFormatItem<'_>] = format_description!("[hour]:[minute]:[second]");
 pub const DATE_TIME_FORMAT: &[BorrowedFormatItem<'_>] =
     format_description!("[year]-[month]-[day] [hour]:[minute]:[second]");
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UsosDate(#[serde(with = "crate::date_string")] pub time::Date);
+
+impl From<UsosDate> for time::Date {
+    fn from(date: UsosDate) -> Self {
+        date.0
+    }
+}
+
+impl From<time::Date> for UsosDate {
+    fn from(date: time::Date) -> Self {
+        UsosDate(date)
+    }
+}
+
+impl Display for UsosDate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.format(DATE_FORMAT).unwrap())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UsosTime(#[serde(with = "crate::time_string")] pub time::Time);
+
+impl From<UsosTime> for time::Time {
+    fn from(time: UsosTime) -> Self {
+        time.0
+    }
+}
+
+impl From<time::Time> for UsosTime {
+    fn from(time: time::Time) -> Self {
+        UsosTime(time)
+    }
+}
+
+impl Display for UsosTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.format(TIME_FORMAT).unwrap())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UsosDateTime(#[serde(with = "crate::datetime_string")] pub time::PrimitiveDateTime);
+
+impl From<UsosDateTime> for time::PrimitiveDateTime {
+    fn from(datetime: UsosDateTime) -> Self {
+        datetime.0
+    }
+}
+
+impl From<time::PrimitiveDateTime> for UsosDateTime {
+    fn from(datetime: time::PrimitiveDateTime) -> Self {
+        UsosDateTime(datetime)
+    }
+}
+
+impl Display for UsosDateTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.format(DATE_TIME_FORMAT).unwrap())
+    }
+}
 
 #[cfg(test)]
 mod tests {
