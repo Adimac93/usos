@@ -33,9 +33,9 @@ impl OutputDirectory {
     }
 }
 
-pub(crate) async fn traverse_above(node: impl AsRef<str>) -> Result<(), AppError> {
+pub(crate) async fn traverse_above(api_path: impl AsRef<str>) -> Result<(), AppError> {
     let mut acc = "".to_string();
-    for written in node.as_ref().split('/') {
+    for written in api_path.as_ref().split('/') {
         if !acc.is_empty() {
             try_write_module_file(acc.as_str(), written).await?;
             create_dir_all(OutputDirectory::module_dir(acc.as_str()))
