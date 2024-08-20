@@ -2,16 +2,19 @@ use reqwest::Client;
 
 use crate::{
     errors::AppError,
-    reference::{Argument, Field, MethodReference, SignatureRequirement},
+    reference::{Argument, MethodReference, SignatureRequirement},
     UsosUri,
 };
 
-use heck::{ToPascalCase, ToSnakeCase};
+use heck::ToSnakeCase;
 
 use super::code::Code;
 
 const PLACEHOLDER_TYPE: &str = "(type here)";
 const OMITTED_ARG_NAMES: [&str; 2] = ["format", "callback"];
+
+const PARAMS_VAR: &str = "params";
+const URL_VAR: &str = "url";
 
 pub(super) async fn get_usos_endpoint_docs(
     client: &Client,
@@ -68,7 +71,7 @@ pub(super) fn into_code(docs: MethodReference) -> Result<String, AppError> {
         .stop_indent()
         .line(") -> crate::Result<Value> {")
         .indent()
-        .line(format!("let url = UsosUri::with_path(\"{name}\");"))
+        .line(format!("let {URL_VAR} = UsosUri::with_path(\"{name}\");"))
         .merge(generate_param_handling(args, consumer_req, token_req))
         .merge(generate_result())
         .stop_indent()
@@ -125,7 +128,7 @@ fn generate_param_handling<'a>(
     token: SignatureRequirement,
 ) -> Code {
     Code::new()
-        .line("let mut params = Params::new();")
+        .line(format!("let mut {PARAMS_VAR} = Params::new();"))
         .line("")
         .merge(for_each_arg(args, generate_add_to_params_map))
         .merge(generate_params_sign(consumer, token))
@@ -133,7 +136,7 @@ fn generate_param_handling<'a>(
 
 fn generate_add_to_params_map(arg: &Argument) -> Code {
     let arg_name = &*arg.name;
-    let add_param_line = format!("params = params.add(\"{arg_name}\", {arg_name});");
+    let add_param_line = format!("{PARAMS_VAR} = {PARAMS_VAR}.add(\"{arg_name}\", {arg_name});");
 
     let res = if arg.is_required {
         Code::new().line(add_param_line)
@@ -167,10 +170,10 @@ fn generate_params_sign(consumer: SignatureRequirement, token: SignatureRequirem
     };
 
     Code::new()
-        .line("params = params.sign(")
+        .line(format!("{PARAMS_VAR} = {PARAMS_VAR}.sign("))
         .indent()
         .line("\"POST\",")
-        .line("&url,")
+        .line(format!("&{URL_VAR},"))
         .line(consumer_key_line)
         .line(token_key_line)
         .stop_indent()
@@ -182,8 +185,8 @@ fn generate_result() -> Code {
     Code::new()
         .line("let body = CLIENT")
         .indent()
-        .line(".post(&url)")
-        .line(".form(&params)")
+        .line(format!(".post(&{URL_VAR})"))
+        .line(format!(".form(&{PARAMS_VAR})"))
         .line(".process_as_json()")
         .line(".await?;")
         .stop_indent()
