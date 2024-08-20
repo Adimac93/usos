@@ -44,6 +44,20 @@ pub(crate) enum SignatureRequirement {
     Ignored,
 }
 
+impl SignatureRequirement {
+    pub(crate) fn is_ignored(&self) -> bool {
+        self == &SignatureRequirement::Ignored
+    }
+
+    pub(crate) fn is_optional(&self) -> bool {
+        self == &SignatureRequirement::Optional
+    }
+
+    pub(crate) fn is_required(&self) -> bool {
+        self == &SignatureRequirement::Required
+    }
+}
+
 impl Display for SignatureRequirement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let res = match self {
