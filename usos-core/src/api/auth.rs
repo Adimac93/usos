@@ -32,7 +32,7 @@ pub async fn acquire_request_token(
     scopes: Scopes,
 ) -> crate::Result<OAuthRequestToken> {
     let callback = callback.unwrap_or("oob".into());
-    let url = UsosUri::with_path("/services/oauth/request_token");
+    let url = UsosUri::with_path("services/oauth/request_token");
 
     let params = Params::from(HashMap::from([
         ("oauth_callback".into(), callback.clone()),
@@ -71,7 +71,7 @@ pub async fn acquire_access_token(
     request_token: OAuthRequestToken,
     verifier: impl Into<String>,
 ) -> crate::Result<AccessToken> {
-    let url = UsosUri::with_path("/services/oauth/access_token");
+    let url = UsosUri::with_path("services/oauth/access_token");
 
     let params = Params::from(HashMap::from([("oauth_verifier".into(), verifier.into())])).sign(
         "POST",
@@ -114,7 +114,7 @@ async fn get_pin(oauth_token: String) -> String {
     println!(
         "Please visit the following URL to authorize the application: {}",
         UsosUri::with_path(&format!(
-            "/services/oauth/authorize?oauth_token={oauth_token}"
+            "services/oauth/authorize?oauth_token={oauth_token}"
         ))
     );
 

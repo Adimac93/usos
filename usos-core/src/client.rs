@@ -6,10 +6,9 @@ impl UsosUri {
     pub const DOMAIN: &'static str = "apps.usos.pwr.edu.pl";
 
     pub fn origin() -> String {
-        format!("https://{}", Self::DOMAIN)
+        format!("https://{}/", Self::DOMAIN)
     }
 
-    // TODO: with_path should be a macro that checks syntax at compilation time
     pub fn with_path(path: impl AsRef<str>) -> String {
         format!("{}{}", Self::origin(), path.as_ref())
     }

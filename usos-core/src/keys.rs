@@ -38,21 +38,21 @@ impl ConsumerKey {
         email: &str,
     ) -> crate::Result<Self> {
         let form = RegistrationForm::new(app_name, website_url, email);
-        let response = CLIENT.get(UsosUri::with_path("/developers")).send().await?;
+        let response = CLIENT.get(UsosUri::with_path("developers")).send().await?;
         let csrf_token_cookie = response
             .cookies()
             .next()
             .context("Csrf token cookie expected but not found")?;
 
         let response = CLIENT
-            .post(UsosUri::with_path("/developers/submit"))
+            .post(UsosUri::with_path("developers/submit"))
             .header(
                 "Cookie",
                 &format!("csrftoken={}", csrf_token_cookie.value()),
             )
             .header("Host", UsosUri::DOMAIN)
             .header("Origin", UsosUri::origin())
-            .header("Referer", UsosUri::with_path("/developers"))
+            .header("Referer", UsosUri::with_path("developers"))
             .header("X-CSRFToken", csrf_token_cookie.value())
             .form(&form)
             .send()
@@ -77,7 +77,7 @@ impl ConsumerKey {
     pub async fn revoke(self) -> crate::Result<()> {
         let form = RevokeForm::new(self.key, self.secret.expose_secret());
         let response = CLIENT
-            .get(UsosUri::with_path("/services/oauth/revoke_consumer_key"))
+            .get(UsosUri::with_path("services/oauth/revoke_consumer_key"))
             .query(&form)
             .send()
             .await?;
@@ -178,7 +178,7 @@ pub async fn gen_consumer_keys(
         .await
         .unwrap();
 
-    client.goto(&UsosUri::with_path("/developers")).await?;
+    client.goto(&UsosUri::with_path("developers")).await?;
     client
         .find(Locator::Id("appname"))
         .await?
@@ -218,7 +218,7 @@ async fn revoke_consumer_keys(consumer_key: &str, consumer_secret: &str) -> Resu
         .await
         .unwrap();
 
-    client.goto(&UsosUri::with_path("/developers")).await?;
+    client.goto(&UsosUri::with_path("developers")).await?;
     client
         .find(Locator::Id("consumer_key"))
         .await?
