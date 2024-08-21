@@ -8,6 +8,8 @@ pub const DATE_FORMAT: &[BorrowedFormatItem<'_>] = format_description!("[year]-[
 pub const TIME_FORMAT: &[BorrowedFormatItem<'_>] = format_description!("[hour]:[minute]:[second]");
 pub const DATE_TIME_FORMAT: &[BorrowedFormatItem<'_>] =
     format_description!("[year]-[month]-[day] [hour]:[minute]:[second]");
+pub const PRECISE_DATE_TIME_FORMAT: &[BorrowedFormatItem<'_>] =
+    format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6]");
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UsosDate(#[serde(with = "crate::date_string")] pub time::Date);
@@ -72,27 +74,41 @@ impl Display for UsosDateTime {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UsosPreciseDateTime(
+    #[serde(with = "crate::precise_datetime_string")] pub time::PrimitiveDateTime,
+);
+
+impl From<UsosPreciseDateTime> for time::PrimitiveDateTime {
+    fn from(datetime: UsosPreciseDateTime) -> Self {
+        datetime.0
+    }
+}
+
+impl From<time::PrimitiveDateTime> for UsosPreciseDateTime {
+    fn from(datetime: time::PrimitiveDateTime) -> Self {
+        UsosPreciseDateTime(datetime)
+    }
+}
+
+impl Display for UsosPreciseDateTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.format(PRECISE_DATE_TIME_FORMAT).unwrap())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{date_string, datetime_string, time_string};
+    use crate::api::types::time::{UsosDate, UsosDateTime, UsosPreciseDateTime, UsosTime};
     use serde::Deserialize;
     use time::{Date, PrimitiveDateTime, Time};
-
-    #[derive(Deserialize)]
-    struct DateString(#[serde(with = "date_string")] Date);
-
-    #[derive(Deserialize)]
-    struct TimeString(#[serde(with = "time_string")] Time);
-
-    #[derive(Deserialize)]
-    struct DateTimeString(#[serde(with = "datetime_string")] PrimitiveDateTime);
 
     #[test]
     fn valid_date_string() {
         let (year, month, day) = (2024, 1, 1);
         let string = format!("{year:0>4}-{month:0>2}-{day:0>2}");
         let value = serde_json::to_value(string).unwrap();
-        let date = DateString::deserialize(value).unwrap();
+        let date = UsosDate::deserialize(value).unwrap();
         assert_eq!(
             date.0,
             Date::from_calendar_date(year, time::Month::try_from(month).unwrap(), day).unwrap()
@@ -104,7 +120,7 @@ mod tests {
         let (hour, minute, second) = (12, 34, 56);
         let string = format!("{hour:0>2}:{minute:0>2}:{second:0>2}");
         let value = serde_json::to_value(string).unwrap();
-        let time = TimeString::deserialize(value).unwrap();
+        let time = UsosTime::deserialize(value).unwrap();
         assert_eq!(time.0, Time::from_hms(12, 34, 56).unwrap());
     }
 
@@ -116,12 +132,31 @@ mod tests {
             format!("{year:0>4}-{month:0>2}-{day:0>2} {hour:0>2}:{minute:0>2}:{second:0>2}");
         println!("{}", string);
         let value = serde_json::to_value(string).unwrap();
-        let datetime = DateTimeString::deserialize(value).unwrap();
+        let datetime = UsosDateTime::deserialize(value).unwrap();
         assert_eq!(
             datetime.0,
             PrimitiveDateTime::new(
                 Date::from_calendar_date(year, time::Month::try_from(month).unwrap(), day).unwrap(),
                 Time::from_hms(hour, minute, second).unwrap()
+            )
+        );
+    }
+
+    #[test]
+    fn valid_precise_datetime_string() {
+        let (year, month, day) = (2024, 1, 1);
+        let (hour, minute, second, microsecond) = (12, 34, 56, 54321);
+        let string = format!(
+            "{year:0>4}-{month:0>2}-{day:0>2} {hour:0>2}:{minute:0>2}:{second:0>2}.{microsecond:0>6}"
+        );
+        println!("{}", string);
+        let value = serde_json::to_value(string).unwrap();
+        let datetime = UsosPreciseDateTime::deserialize(value).unwrap();
+        assert_eq!(
+            datetime.0,
+            PrimitiveDateTime::new(
+                Date::from_calendar_date(year, time::Month::try_from(month).unwrap(), day).unwrap(),
+                Time::from_hms_micro(hour, minute, second, microsecond).unwrap()
             )
         );
     }

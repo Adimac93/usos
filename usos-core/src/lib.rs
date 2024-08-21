@@ -13,5 +13,10 @@ time::serde::format_description!(
     PrimitiveDateTime,
     api::types::time::DATE_TIME_FORMAT
 );
+time::serde::format_description!(
+    precise_datetime_string,
+    PrimitiveDateTime,
+    api::types::time::PRECISE_DATE_TIME_FORMAT
+);
 
 pub type Result<T> = std::result::Result<T, errors::AppError>;
