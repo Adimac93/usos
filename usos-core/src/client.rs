@@ -1,5 +1,9 @@
 use std::{cell::LazyCell, ops::Deref};
 
+use reqwest::Response;
+
+use crate::api::errors::UsosError;
+
 pub struct UsosUri;
 
 impl UsosUri {
@@ -44,3 +48,19 @@ impl Deref for Client {
 }
 
 pub const CLIENT: LazyCell<Client> = LazyCell::new(|| Client::new("https://apps.usos.pwr.edu.pl/"));
+
+#[async_trait::async_trait]
+pub trait UsosDebug {
+    async fn debug(self) -> Result<Response, UsosError>;
+}
+
+#[async_trait::async_trait]
+impl UsosDebug for reqwest::Response {
+    async fn debug(self) -> Result<Response, UsosError> {
+        if self.status().is_client_error() {
+            let error = self.json::<UsosError>().await.unwrap();
+            return Err(error);
+        }
+        Ok(self)
+    }
+}
