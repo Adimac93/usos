@@ -6,11 +6,10 @@ use crate::{
     UsosUri,
 };
 
-use heck::ToSnakeCase;
-
 use super::code::Code;
 
 const PLACEHOLDER_TYPE: &str = "(type here)";
+const PLACEHOLDER_NAME: &str = "(name here)";
 const OMITTED_ARG_NAMES: [&str; 2] = ["format", "callback"];
 
 const PARAMS_VAR: &str = "params";
@@ -31,7 +30,6 @@ pub(super) async fn get_usos_endpoint_docs(
 
 pub(super) fn into_code(docs: MethodReference) -> Result<String, AppError> {
     let name = docs.name;
-    let snake_case_name = name.to_snake_case();
 
     let consumer_req = docs.auth_options.consumer;
     let scopes = docs.auth_options.scopes;
@@ -45,7 +43,7 @@ pub(super) fn into_code(docs: MethodReference) -> Result<String, AppError> {
     let other_arguments = for_each_arg(args, generate_function_argument);
 
     let mut res = Code::new()
-        .merge(generate_imports(consumer_req))
+        .merge(generate_imports())
         .line(format!("/// {name}"))
         .line("///")
         .line(format!("/// Consumer: {consumer_req}"))
@@ -55,7 +53,7 @@ pub(super) fn into_code(docs: MethodReference) -> Result<String, AppError> {
         .line(format!("/// Scopes: {scopes:?}"))
         .line("///")
         .line(format!("/// SSL: {ssl_required}"))
-        .line(format!("pub async fn {snake_case_name} ("))
+        .line(format!("pub async fn {PLACEHOLDER_NAME} ("))
         .indent();
 
     if !consumer_req.is_ignored() {
@@ -75,7 +73,9 @@ pub(super) fn into_code(docs: MethodReference) -> Result<String, AppError> {
         .merge(generate_param_handling(args, consumer_req, token_req))
         .merge(generate_result())
         .stop_indent()
-        .line("}");
+        .line("}")
+        .line("")
+        .merge(generate_test(consumer_req, token_req, &docs.arguments));
 
     Ok(res.to_code_string())
 }
@@ -92,17 +92,13 @@ fn for_each_arg<'a>(
     })
 }
 
-fn generate_imports(consumer_req: SignatureRequirement) -> Code {
-    let mut res = Code::new();
-
-    if consumer_req != SignatureRequirement::Ignored {
-        res = res.line("use crate::keys::ConsumerKey;")
-    }
-
-    res.line("use crate::{")
+fn generate_imports() -> Code {
+    Code::new()
+        .line("use crate::{")
         .indent()
         .line("api::params::Params,")
         .line("client::{UsosUri, CLIENT},")
+        .line("keys::ConsumerKey,")
         .line("util::Process,")
         .stop_indent()
         .line("};")
@@ -124,33 +120,20 @@ fn generate_function_argument(arg: &Argument) -> Code {
 }
 
 fn generate_param_handling<'a>(
-    args: impl IntoIterator<Item = &'a Argument>,
+    args: &[Argument],
     consumer: SignatureRequirement,
     token: SignatureRequirement,
 ) -> Code {
     Code::new()
         .line(format!("let mut {PARAMS_VAR} = Params::new();"))
-        .line("")
         .merge(for_each_arg(args, generate_add_to_params_map))
+        .line("")
         .merge(generate_params_sign(consumer, token))
 }
 
 fn generate_add_to_params_map(arg: &Argument) -> Code {
     let arg_name = &*arg.name;
-    let add_param_line = format!("{PARAMS_VAR} = {PARAMS_VAR}.add(\"{arg_name}\", {arg_name});");
-
-    let res = if arg.is_required {
-        Code::new().line(add_param_line)
-    } else {
-        Code::new()
-            .line(format!("if let Some({arg_name}) = {arg_name} {{"))
-            .indent()
-            .line(add_param_line)
-            .stop_indent()
-            .line("}")
-    };
-
-    res.line("")
+    Code::new().line(format!("params = params.add(\"{arg_name}\", {arg_name});"))
 }
 
 fn generate_params_sign(consumer: SignatureRequirement, token: SignatureRequirement) -> Code {
@@ -173,7 +156,7 @@ fn generate_params_sign(consumer: SignatureRequirement, token: SignatureRequirem
     Code::new()
         .line(format!("{PARAMS_VAR} = {PARAMS_VAR}.sign("))
         .indent()
-        .line("\"POST\",")
+        .line("\"GET\",")
         .line(format!("&{URL_VAR},"))
         .line(consumer_key_line)
         .line(token_key_line)
@@ -186,12 +169,64 @@ fn generate_result() -> Code {
     Code::new()
         .line("let body = CLIENT")
         .indent()
-        .line(format!(".post(&{URL_VAR})"))
-        .line(format!(".form(&{PARAMS_VAR})"))
+        .line(format!(".get(&{URL_VAR})"))
+        .line(format!(".query(&{PARAMS_VAR})"))
         .line(".process_as_json()")
         .line(".await?;")
         .stop_indent()
         .line("Ok(body)")
+}
+
+fn generate_test(
+    consumer_req: SignatureRequirement,
+    token_req: SignatureRequirement,
+    args: &[Argument],
+) -> Code {
+    let arg_lines = for_each_arg(args, generate_arg_variable);
+
+    let mut res = Code::new()
+        .line("#[cfg(test)]")
+        .line("mod tests {")
+        .indent()
+        .line("use super::*;")
+        .line("")
+        .line("#[tokio::test]")
+        .line("#[ignore]")
+        .line("async fn health_check() {")
+        .indent()
+        .line("dotenvy::dotenv().ok();")
+        .line("let consumer_key = ConsumerKey::from_env().unwrap();")
+        .line(format!("let res = {PLACEHOLDER_NAME}("));
+
+    if consumer_req.is_required() {
+        res = res.line("&consumer_key,");
+    } else if consumer_req.is_optional() {
+        res = res.line("None,");
+    }
+
+    if token_req.is_required() {
+        res = res.line("token,");
+    } else if token_req.is_optional() {
+        res = res.line("None,");
+    }
+
+    res.merge(arg_lines)
+        .line(").await.unwrap();")
+        .line("println!(\"{res}\");")
+        .stop_indent()
+        .line("}")
+        .stop_indent()
+        .line("}")
+}
+
+fn generate_arg_variable(arg: &Argument) -> Code {
+    let line = if arg.is_required {
+        format!("{},", arg.name)
+    } else {
+        "None,".into()
+    };
+
+    Code::new().line(line)
 }
 
 fn option(inner: impl AsRef<str>) -> String {
