@@ -29,6 +29,7 @@ pub async fn get_method_index() -> Vec<MethodBrief> {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_method_index() {
     let methods = get_method_index().await;
     println!("{methods:#?}");

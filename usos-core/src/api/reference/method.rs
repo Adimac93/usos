@@ -26,6 +26,7 @@ pub async fn get_method_info(method_name: &str) -> MethodReference {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_method_info() {
     let method = get_method_info("services/apiref/method").await;
     println!("{:?}", method);

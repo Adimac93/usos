@@ -146,6 +146,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore]
     async fn acquire_request_token_is_successful() {
         dotenvy::dotenv().ok();
         let consumer_key = ConsumerKey::from_env().unwrap();
@@ -155,6 +156,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn acquire_request_token_invalid_consumer_key() {
         dotenvy::dotenv().ok();
         let mut consumer_key = ConsumerKey::from_env().unwrap();

@@ -43,6 +43,7 @@ pub async fn get_scopes(method_name: &str) -> Vec<ApiScope> {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_scopes() {
     let scopes = get_scopes("services/apiref/method").await;
     println!("{scopes:?}");

@@ -51,6 +51,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore]
     async fn health_check() {
         dotenvy::dotenv().ok();
         let consumer_key = ConsumerKey::from_env().unwrap();

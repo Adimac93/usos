@@ -103,6 +103,7 @@ impl Display for Visibility {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_faculty() {
     let faculty = search_faculties(Language::English, "Kwes", None, None, None).await;
     println!("{faculty:?}");

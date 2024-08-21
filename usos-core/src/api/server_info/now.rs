@@ -30,6 +30,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore]
     async fn health_check() {
         let res = get_usos_server_time().await.unwrap();
         println!("{res}");

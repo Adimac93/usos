@@ -48,6 +48,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore]
     async fn health_check() {
         let fields = "base_url|version|machine_version|usos_schema_version|institution_name|institution[id|name|profile_url|homepage_url|phone_numbers|phone_numbers2|postal_address|email|is_public|static_map_urls]|contact_emails|schac_id|mcards_support".to_string();
         let res = get_installation_info(Some(fields)).await.unwrap();

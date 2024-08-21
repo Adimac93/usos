@@ -33,6 +33,7 @@ pub async fn get_faculty(faculty_id: &str) -> Value {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_faculty() {
     let faculty = get_faculty("K30W04ND03").await;
     println!("{faculty}");

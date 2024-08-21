@@ -35,6 +35,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore]
     async fn health_check() {
         let res = get_installations().await.unwrap();
         let res: Vec<InstallationListItem> =

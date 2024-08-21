@@ -27,6 +27,7 @@ pub async fn get_module_info(module_name: Module) -> ModuleInfo {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_module_info() {
     let module_info = get_module_info(Module::ApiReference).await;
     println!("{:?}", module_info);
