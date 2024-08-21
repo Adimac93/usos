@@ -101,8 +101,9 @@ fn generate_imports(consumer_req: SignatureRequirement) -> Code {
 
     res.line("use crate::{")
         .indent()
+        .line("api::params::Params,")
         .line("client::{UsosUri, CLIENT},")
-        .line("util::{Process, Params},")
+        .line("util::Process,")
         .stop_indent()
         .line("};")
         .line("use serde_json::Value;")

@@ -2,6 +2,7 @@ pub mod auth;
 pub mod errors;
 pub mod faculties;
 pub mod oauth1;
+pub mod params;
 pub mod reference;
 pub mod scopes;
 pub mod server_info;

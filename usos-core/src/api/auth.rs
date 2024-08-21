@@ -7,11 +7,11 @@ use anyhow::Context;
 use secrecy::SecretString;
 
 use crate::{
-    api::{oauth1::authorize, scopes::Scope},
+    api::{oauth1::authorize, params::Params, scopes::Scope},
     client::{UsosUri, CLIENT},
     errors::AppError,
     keys::ConsumerKey,
-    util::{parse_ampersand_params, Params, Process},
+    util::{parse_ampersand_params, Process},
 };
 
 use super::scopes::Scopes;

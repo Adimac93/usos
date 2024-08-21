@@ -80,40 +80,6 @@ pub(crate) fn format_selector_fields(fields: Vec<Field>) -> String {
         .join("|")
 }
 
-#[derive(Serialize)]
-pub struct Params(HashMap<String, String>);
-
-impl Params {
-    pub fn new() -> Self {
-        Self(HashMap::new())
-    }
-
-    pub fn add(mut self, k: impl Into<String>, v: impl Into<String>) -> Self {
-        self.0.insert(k.into(), v.into());
-        self
-    }
-
-    pub fn sign(
-        mut self,
-        method: &str,
-        uri: &str,
-        consumer: Option<&ConsumerKey>,
-        token: Option<&AccessToken>,
-    ) -> Self {
-        if let Some(consumer) = consumer {
-            self.0 = authorize(method, uri, consumer, token, Some(self.0));
-        }
-
-        self
-    }
-}
-
-impl From<HashMap<String, String>> for Params {
-    fn from(value: HashMap<String, String>) -> Self {
-        Self(value)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
