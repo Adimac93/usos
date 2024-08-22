@@ -1,9 +1,8 @@
 use std::fmt::Display;
 
 use serde::Deserialize;
-use serde_json::Value;
 
-use crate::client::CLIENT;
+use crate::client::{UsosUri, CLIENT};
 
 /// apiref/module
 ///
@@ -16,7 +15,7 @@ use crate::client::CLIENT;
 /// SSL: not required
 pub async fn get_module_info(module_name: Module) -> ModuleInfo {
     let response = CLIENT
-        .get("https://apps.usos.pwr.edu.pl/services/apiref/module")
+        .get(UsosUri::with_path("services/apiref/module"))
         .query(&[("name", format!("services/{module_name}"))])
         .send()
         .await

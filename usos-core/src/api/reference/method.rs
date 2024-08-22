@@ -1,7 +1,9 @@
 use serde::Deserialize;
-use serde_json::{json, Value};
 
-use crate::{api::scopes::Scope, client::CLIENT};
+use crate::{
+    api::scopes::Scope,
+    client::{UsosUri, CLIENT},
+};
 /// apiref/method
 ///
 /// Consumer: optional (required only for `admin_access`)
@@ -13,16 +15,13 @@ use crate::{api::scopes::Scope, client::CLIENT};
 /// SSL: not required
 pub async fn get_method_info(method_name: &str) -> MethodReference {
     let response = CLIENT
-        .get(format!(
-            "https://apps.usos.pwr.edu.pl/services/apiref/method"
-        ))
+        .get(UsosUri::with_path("services/apiref/method"))
         .query(&[("name", method_name)])
         .send()
         .await
         .unwrap();
 
-    let json = response.json::<MethodReference>().await.unwrap();
-    json
+    response.json().await.unwrap()
 }
 
 #[tokio::test]
@@ -57,7 +56,7 @@ enum SignatureRequirement {
 
 // name|short_name|description|brief_description|ref_url|auth_options|arguments|returns|errors|result_fields|beta|deprecated|admin_access|is_internal
 #[derive(Debug, Deserialize)]
-struct MethodReference {
+pub struct MethodReference {
     /// name of the method
     name: String,
     /// name without a path
