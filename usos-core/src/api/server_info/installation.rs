@@ -1,7 +1,7 @@
 use crate::{
     api::{faculties::faculty::Faculty, params::Params, types::language::LanguageDictionary},
     client::{UsosUri, CLIENT},
-    util::Process,
+    util::{Process, Selector},
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -31,7 +31,7 @@ pub struct Installation {
 /// Scopes: []
 ///
 /// SSL: false
-pub async fn get_installation_info(fields: Option<String>) -> crate::Result<Value> {
+pub async fn get_installation_info(fields: Option<Selector>) -> crate::Result<Value> {
     let url = UsosUri::with_path("services/apisrv/installation");
     let mut params = Params::new();
 

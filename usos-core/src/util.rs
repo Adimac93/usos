@@ -67,7 +67,9 @@ pub enum Field<'a> {
     Nested(&'a str, Vec<Field<'a>>),
 }
 
-pub(crate) fn format_selector_fields(fields: Vec<Field>) -> String {
+pub type Selector = String;
+
+pub(crate) fn format_selector_fields(fields: Vec<Field>) -> Selector {
     fields
         .into_iter()
         .map(|x| match x {

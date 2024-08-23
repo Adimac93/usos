@@ -99,7 +99,7 @@ fn generate_imports() -> Code {
         .line("api::params::Params,")
         .line("client::{UsosUri, CLIENT},")
         .line("keys::ConsumerKey,")
-        .line("util::Process,")
+        .line("util::{Process, Selector},")
         .stop_indent()
         .line("};")
         .line("use serde_json::Value;")

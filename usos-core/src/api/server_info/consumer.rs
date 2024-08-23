@@ -3,6 +3,7 @@ use crate::api::params::Params;
 use crate::api::scopes::Scope;
 use crate::api::types::time::UsosDateTime;
 use crate::keys::ConsumerKey;
+use crate::util::Selector;
 use crate::{
     client::{UsosUri, CLIENT},
     util::Process,
@@ -33,12 +34,12 @@ pub struct ConsumerInfo {
 pub async fn get_consumer_info(
     consumer_key: &ConsumerKey,
     token: Option<AccessToken>,
-    fields: String,
+    fields: impl Into<Selector>,
 ) -> crate::Result<Value> {
     let url = UsosUri::with_path("services/apisrv/consumer");
     let mut params = Params::new();
 
-    params = params.add("fields", fields);
+    params = params.add("fields", fields.into());
 
     params = params.sign("GET", &url, Some(consumer_key), token.as_ref());
 
