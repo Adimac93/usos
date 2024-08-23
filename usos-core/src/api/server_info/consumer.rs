@@ -2,11 +2,11 @@ use crate::api::auth::AccessToken;
 use crate::api::params::Params;
 use crate::api::scopes::Scope;
 use crate::api::types::time::UsosDateTime;
+use crate::api::util::Selector;
 use crate::keys::ConsumerKey;
-use crate::util::Selector;
 use crate::{
+    api::util::Process,
     client::{UsosUri, CLIENT},
-    util::Process,
 };
 use serde::Deserialize;
 use serde_json::Value;

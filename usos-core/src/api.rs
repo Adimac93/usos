@@ -7,3 +7,4 @@ pub mod reference;
 pub mod scopes;
 pub mod server_info;
 pub mod types;
+pub mod util;

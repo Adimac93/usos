@@ -2,8 +2,8 @@ use serde::Deserialize;
 
 use crate::{
     api::types::language::LanguageDictionary,
+    api::util::Process,
     client::{UsosUri, CLIENT},
-    util::Process,
 };
 
 #[derive(Deserialize, Debug)]

@@ -1,7 +1,7 @@
 use crate::{
     api::types::time::UsosPreciseDateTime,
+    api::util::Process,
     client::{UsosUri, CLIENT},
-    util::Process,
 };
 use anyhow::Context;
 use serde::Deserialize;

@@ -1,7 +1,7 @@
 use crate::{
+    api::util::{Process, Selector},
     api::{faculties::faculty::Faculty, params::Params, types::language::LanguageDictionary},
     client::{UsosUri, CLIENT},
-    util::{Process, Selector},
 };
 use serde::Deserialize;
 use serde_json::Value;

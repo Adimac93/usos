@@ -1,13 +1,9 @@
 use std::collections::HashMap;
 
 use reqwest::Response;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
 
-use crate::{
-    api::{auth::AccessToken, errors::UsosError, oauth1::authorize},
-    errors::AppError,
-    keys::ConsumerKey,
-};
+use crate::{api::errors::UsosError, errors::AppError};
 
 pub(crate) trait Process
 where
