@@ -11,6 +11,8 @@ pub enum AppError {
         code: StatusCode,
         message: UsosError,
     },
+    #[error("Called unknown method {0}")]
+    UnknownMethod(String),
     #[error("Response parsing failed: {0}")]
     Parse(String),
     #[error(transparent)]
