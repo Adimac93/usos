@@ -2,7 +2,6 @@ pub mod api;
 pub mod client;
 pub mod errors;
 pub mod keys;
-pub mod util;
 pub mod webdriver;
 
 // should stay in projecet root, see issue https://github.com/time-rs/time/issues/597
