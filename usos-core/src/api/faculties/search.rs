@@ -48,19 +48,19 @@ pub async fn search_faculties(
 }
 
 #[derive(Debug, Deserialize)]
-struct FacultySearch {
-    items: Vec<FacultySearchItem>,
-    next_page: bool,
+pub struct FacultySearch {
+    pub items: Vec<FacultySearchItem>,
+    pub next_page: bool,
 }
 
 #[derive(Debug, Deserialize)]
-struct FacultySearchItem {
-    id: String,
+pub struct FacultySearchItem {
+    pub id: String,
     #[serde(rename = "match")]
-    match_string: String,
+    pub match_string: String,
 }
 
-struct SearchResults(u8);
+pub struct SearchResults(u8);
 
 impl TryFrom<u8> for SearchResults {
     type Error = String;
@@ -74,7 +74,7 @@ impl TryFrom<u8> for SearchResults {
     }
 }
 
-struct StartIndex(u16);
+pub struct StartIndex(u16);
 
 impl TryFrom<u16> for StartIndex {
     type Error = String;
@@ -88,7 +88,7 @@ impl TryFrom<u16> for StartIndex {
     }
 }
 
-enum Visibility {
+pub enum Visibility {
     Public,
     All,
 }
