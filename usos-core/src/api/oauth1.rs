@@ -36,10 +36,10 @@ pub fn authorize<'a>(
     params.insert("oauth_nonce".into(), nonce);
     params.insert("oauth_signature_method".into(), "HMAC-SHA1".into());
     params.insert("oauth_timestamp".into(), timestamp);
-    params.insert("oauth_version".into(), OAUTH_VERSION.into());
     if let Some(tk) = token {
         params.insert("oauth_token".into(), tk.token.as_str().into());
     }
+    params.insert("oauth_version".into(), OAUTH_VERSION.into());
 
     let signature = gen_signature(
         method,
@@ -77,10 +77,10 @@ where
         "HMAC-SHA1".to_string()
     ));
     params.push_str(&format!("oauth_timestamp={}&", timestamp));
-    params.push_str(&format!("oauth_version={}", OAUTH_VERSION.to_string()));
     if let Some(tk) = token {
         params.push_str(&format!("&oauth_token={}", tk.token.as_str().to_string()));
     }
+    params.push_str(&format!("oauth_version={}", OAUTH_VERSION.to_string()));
 
     let signature = gen_signature(
         method,
@@ -90,7 +90,7 @@ where
         token.map(|t| t.secret.expose_secret().as_ref()),
     );
 
-    params.push_str(&format!("&oauth_signature={}", signature));
+    params.push_str(&format!("&oauth_signature={}", to_url_encoded(&signature)));
 
     params
 }
