@@ -54,6 +54,47 @@ pub fn authorize<'a>(
     params
 }
 
+// TODO: remove redundancy in authorize function
+pub fn authorize_str_params<'a, T>(
+    method: &str,
+    uri: &str,
+    consumer: &ConsumerKey,
+    token: Option<&AccessToken>,
+    params: Option<T>,
+) -> String
+where
+    T: Into<String>,
+{
+    let mut params = params.map_or_else(String::new, |s| format!("{}&", s.into()));
+    let timestamp = time::OffsetDateTime::now_utc().unix_timestamp().to_string();
+
+    let nonce: String = rand_alphanumeric_string(NONCE_LENGTH);
+
+    params.push_str(&format!("oauth_consumer_key={}&", consumer.key.clone()));
+    params.push_str(&format!("oauth_nonce={}&", nonce));
+    params.push_str(&format!(
+        "oauth_signature_method={}&",
+        "HMAC-SHA1".to_string()
+    ));
+    params.push_str(&format!("oauth_timestamp={}&", timestamp));
+    params.push_str(&format!("oauth_version={}", OAUTH_VERSION.to_string()));
+    if let Some(tk) = token {
+        params.push_str(&format!("&oauth_token={}", tk.token.as_str().to_string()));
+    }
+
+    let signature = gen_signature(
+        method,
+        uri,
+        &params,
+        consumer.secret.expose_secret(),
+        token.map(|t| t.secret.expose_secret().as_ref()),
+    );
+
+    params.push_str(&format!("&oauth_signature={}", signature));
+
+    params
+}
+
 // Encode all but the unreserved characters defined in
 // RFC 3986, section 2.3. "Unreserved Characters"
 // https://tools.ietf.org/html/rfc3986#page-12

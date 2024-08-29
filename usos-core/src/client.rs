@@ -5,12 +5,16 @@ use std::{
     ops::Deref,
 };
 
-use reqwest::{RequestBuilder, Response, StatusCode};
-use serde::Serialize;
+use reqwest::{header::CONTENT_TYPE, RequestBuilder, Response, StatusCode};
+use serde::{Serialize, Serializer};
 use serde_json::{json, Value};
 
 use crate::{
-    api::{auth::AccessToken, errors::UsosError, oauth1::authorize},
+    api::{
+        auth::AccessToken,
+        errors::UsosError,
+        oauth1::{authorize, authorize_str_params},
+    },
     errors::AppError,
     keys::ConsumerKey,
 };
@@ -49,7 +53,7 @@ impl Client {
         Self { base_url, client }
     }
 
-    fn builder<T: Serialize + Debug>(&self, uri: String) -> UsosRequestBuilder<T> {
+    fn builder(&self, uri: String) -> UsosRequestBuilder {
         UsosRequestBuilder::new(&self.client, format!("{}/services/{uri}", self.base_url))
     }
 }
@@ -80,63 +84,60 @@ impl UsosDebug for reqwest::Response {
     }
 }
 
-#[derive(Serialize, Debug)]
-struct Form<T>
-where
-    T: Serialize + Debug,
-{
-    #[serde(flatten)]
-    payload: Option<T>,
-    #[serde(flatten)]
-    auth: HashMap<String, String>,
+#[derive(Default)]
+struct Form<'a> {
+    payload: Option<String>,
+    auth: Option<(&'a ConsumerKey, Option<&'a AccessToken>)>,
+    payload_error: Option<serde_urlencoded::ser::Error>,
 }
 
-impl<T> Form<T>
-where
-    T: Serialize + Debug,
-{
-    fn new(payload: Option<T>, auth: HashMap<String, String>) -> Self {
-        Self { payload, auth }
+impl<'a> Form<'a> {
+    fn new(
+        payload: Option<String>,
+        auth: Option<(&'a ConsumerKey, Option<&'a AccessToken>)>,
+    ) -> Self {
+        Self {
+            payload,
+            auth,
+            payload_error: None,
+        }
     }
 }
 
-struct UsosRequestBuilder<T>
-where
-    T: Serialize + Debug,
-{
+struct UsosRequestBuilder<'a> {
     request_builder: reqwest::RequestBuilder,
     uri: String,
-    form: Option<Form<T>>,
+    form: Form<'a>,
 }
 
-impl<T> UsosRequestBuilder<T>
-where
-    T: Serialize + Debug,
-{
+impl<'a> UsosRequestBuilder<'a> {
     fn new(client: &reqwest::Client, uri: String) -> Self {
         Self {
             request_builder: client.post(&uri),
             uri,
-            form: None,
+            form: Form::new(None, None),
         }
     }
 
-    fn payload(mut self, payload: T) -> Self {
-        if let Some(form) = &mut self.form {
-            form.payload = Some(payload);
-        } else {
-            self.form = Some(Form::new(Some(payload), HashMap::new()))
-        }
+    fn payload<T: Serialize>(mut self, payload: T) -> Self {
+        let form_payload = match serde_urlencoded::to_string(payload) {
+            Ok(p) => p,
+            Err(e) => {
+                self.form.payload_error = Some(e);
+                return self;
+            }
+        };
+
+        self.form.payload = Some(form_payload);
         self
     }
 
-    fn auth(mut self, consumer_key: &ConsumerKey, access_token: Option<&AccessToken>) -> Self {
-        let auth = authorize("POST", &self.uri, consumer_key, access_token, None);
-        if let Some(form) = &mut self.form {
-            form.auth.extend(auth);
-        } else {
-            self.form = Some(Form::new(None, auth))
-        }
+    fn auth(
+        mut self,
+        consumer_key: &'a ConsumerKey,
+        access_token: Option<&'a AccessToken>,
+    ) -> Self {
+        self.form.auth = Some((consumer_key, access_token));
         self
     }
 
@@ -145,10 +146,24 @@ where
         self
     }
 
-    async fn send(mut self) -> Result<Value, AppError> {
-        if let Some(form) = self.form {
-            self.request_builder = self.request_builder.form(&form);
+    async fn request(mut self) -> Result<Response, AppError> {
+        if let Some(e) = self.form.payload_error {
+            // TODO: handle invalid form error
+            return Err(AppError::Unexpected(anyhow::anyhow!(e)));
         }
+
+        let signed_form = match self.form.auth {
+            Some((consumer_key, token)) => {
+                authorize_str_params("POST", &self.uri, consumer_key, token, self.form.payload)
+            }
+            None => self.form.payload.unwrap_or_else(String::new),
+        };
+
+        self.request_builder = self
+            .request_builder
+            .body(signed_form)
+            .header(CONTENT_TYPE, "application/x-www-form-urlencoded");
+
         let response = self.request_builder.send().await?;
         let status = response.status();
         if status.is_client_error() {
@@ -166,9 +181,7 @@ where
             });
         }
         if status.is_success() {
-            let value = response.json().await?;
-            println!("{value:#?}");
-            return Ok(value);
+            return Ok(response);
         }
 
         if response.status().is_server_error() {
@@ -176,12 +189,21 @@ where
         }
         unimplemented!()
     }
+
+    async fn request_json(mut self) -> Result<Value, AppError> {
+        let res = self.request().await?;
+        Ok(res.json().await?)
+    }
 }
 
 #[tokio::test]
 async fn test_usos_client() {
     let client = Client::new("https://apps.usos.pw.edu.pl");
-    let response = client.builder::<Value>("apiref/scopes".into()).send().await;
+    let response = client
+        .builder("apiref/scopes".into())
+        .request_json()
+        .await
+        .unwrap();
 
     println!("{:?}", response);
 }
