@@ -1,3 +1,5 @@
+#![cfg_attr(debug_assertions, allow(unused))]
+
 use crate::generation::generate;
 use cli::prompt_cli;
 use reqwest::Client;

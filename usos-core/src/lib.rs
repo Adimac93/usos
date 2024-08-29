@@ -1,3 +1,5 @@
+#![cfg_attr(debug_assertions, allow(unused))]
+
 pub mod api;
 pub mod client;
 pub mod errors;
