@@ -11,11 +11,7 @@ use serde::{Serialize, Serializer};
 use serde_json::{json, Value};
 
 use crate::{
-    api::{
-        auth::AccessToken,
-        errors::UsosError,
-        oauth1::{authorize, authorize_str_params},
-    },
+    api::{auth::AccessToken, errors::UsosError, oauth1::authorize, params::IntoParams},
     errors::AppError,
     keys::ConsumerKey,
 };
@@ -87,14 +83,14 @@ impl UsosDebug for reqwest::Response {
 
 #[derive(Default)]
 struct Form<'a> {
-    payload: Option<String>,
+    payload: Option<HashMap<String, String>>,
     auth: Option<(&'a ConsumerKey, Option<&'a AccessToken>)>,
     payload_error: Option<serde_urlencoded::ser::Error>,
 }
 
 impl<'a> Form<'a> {
     fn new(
-        payload: Option<String>,
+        payload: Option<HashMap<String, String>>,
         auth: Option<(&'a ConsumerKey, Option<&'a AccessToken>)>,
     ) -> Self {
         Self {
@@ -120,15 +116,8 @@ impl<'a> UsosRequestBuilder<'a> {
         }
     }
 
-    fn payload<T: Serialize>(mut self, payload: T) -> Self {
-        match serde_urlencoded::to_string(payload) {
-            Ok(form_payload) => {
-                self.form.payload = Some(form_payload);
-            }
-            Err(e) => {
-                self.form.payload_error = Some(e);
-            }
-        }
+    fn payload<T: IntoParams>(mut self, payload: T) -> Self {
+        self.form.payload = Some(payload.into_params());
         self
     }
 
@@ -149,15 +138,12 @@ impl<'a> UsosRequestBuilder<'a> {
 
         let signed_form = match self.form.auth {
             Some((consumer_key, token)) => {
-                authorize_str_params("POST", &self.uri, consumer_key, token, self.form.payload)
+                authorize("POST", &self.uri, consumer_key, token, self.form.payload)
             }
-            None => self.form.payload.unwrap_or_else(String::new),
+            None => self.form.payload.unwrap_or_else(HashMap::new),
         };
 
-        self.request_builder = self
-            .request_builder
-            .body(signed_form)
-            .header(CONTENT_TYPE, "application/x-www-form-urlencoded");
+        self.request_builder = self.request_builder.form(&signed_form);
 
         let response = self.request_builder.send().await?;
         let status = response.status();
@@ -201,7 +187,8 @@ impl<'a> UsosRequestBuilder<'a> {
 async fn test_usos_client() {
     let client = Client::new("https://apps.usos.pw.edu.pl");
     let response = client
-        .builder("apiref/scopes".into())
+        .builder("apiref/method".into())
+        .payload([("name", "services/apiref/method"), ("fields", "id|name")])
         .request_json()
         .await
         .unwrap();

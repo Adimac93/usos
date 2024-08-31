@@ -6,82 +6,86 @@ use crate::keys::ConsumerKey;
 
 use super::{auth::AccessToken, oauth1::authorize};
 
-#[derive(Serialize)]
-pub struct Params(HashMap<String, String>);
+pub trait IntoParams {
+    fn into_params(self) -> HashMap<String, String>;
+}
 
-impl Params {
-    pub fn new() -> Self {
-        Self(HashMap::new())
-    }
-
-    pub fn add<T, U>(mut self, k: T, v: U) -> Self
-    where
-        (T, U): Param,
-    {
-        if let Some((k, v)) = (k, v).into_kv_pair() {
-            self.0.insert(k, v);
-        }
-
-        self
-    }
-
-    pub fn sign(
-        mut self,
-        method: &str,
-        uri: &str,
-        consumer: Option<&ConsumerKey>,
-        token: Option<&AccessToken>,
-    ) -> Self {
-        if let Some(consumer) = consumer {
-            self.0 = authorize(method, uri, consumer, token, Some(self.0));
-        }
-
-        self
+impl IntoParams for () {
+    fn into_params(self) -> HashMap<String, String> {
+        HashMap::new()
     }
 }
 
-impl From<HashMap<String, String>> for Params {
-    fn from(value: HashMap<String, String>) -> Self {
-        Self(value)
-    }
-}
-
-pub trait Param {
-    fn into_kv_pair(self) -> Option<(String, String)>;
-}
-
-impl<T> Param for (T, String)
+impl<T, U> IntoParams for (T, U)
 where
     T: Into<String>,
+    U: IntoParamString,
 {
-    fn into_kv_pair(self) -> Option<(String, String)> {
-        Some((self.0.into(), self.1.into()))
+    fn into_params(self) -> HashMap<String, String> {
+        HashMap::from([(self.0.into(), self.1.into_param_string())])
     }
 }
 
-impl<T> Param for (T, Option<String>)
+impl<T, U, const N: usize> IntoParams for [(T, U); N]
 where
     T: Into<String>,
+    U: IntoParamString,
 {
-    fn into_kv_pair(self) -> Option<(String, String)> {
-        self.1.map(|x| (self.0.into(), x.into()))
+    fn into_params(self) -> HashMap<String, String> {
+        HashMap::from_iter(
+            self.into_iter()
+                .map(|pair| (pair.0.into(), pair.1.into_param_string())),
+        )
     }
 }
 
-impl<T> Param for (T, &str)
+impl<T, U> IntoParams for HashMap<T, U>
 where
     T: Into<String>,
+    U: IntoParamString,
 {
-    fn into_kv_pair(self) -> Option<(String, String)> {
-        Some((self.0.into(), self.1.into()))
+    fn into_params(self) -> HashMap<String, String> {
+        HashMap::from_iter(
+            self.into_iter()
+                .map(|pair| (pair.0.into(), pair.1.into_param_string())),
+        )
     }
 }
 
-impl<T> Param for (T, Option<&str>)
+impl<T, U> IntoParams for Option<HashMap<T, U>>
 where
-    T: Into<String>,
+    HashMap<T, U>: IntoParams,
 {
-    fn into_kv_pair(self) -> Option<(String, String)> {
-        self.1.map(|x| (self.0.into(), x.into()))
+    fn into_params(self) -> HashMap<String, String> {
+        self.map_or_else(HashMap::new, |x| x.into_params())
+    }
+}
+
+pub trait IntoParamString {
+    fn into_param_string(self) -> String;
+}
+
+macro_rules! impl_into_param_string(
+    ($($x:ty),*) => {
+        $(
+            impl IntoParamString for $x {
+                fn into_param_string(self) -> String {
+                    self.to_string()
+                }
+            }
+        )*
+    }
+);
+
+impl_into_param_string!(
+    String, &str, u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize
+);
+
+impl<T> IntoParamString for Option<T>
+where
+    T: IntoParamString,
+{
+    fn into_param_string(self) -> String {
+        self.map_or_else(String::new, IntoParamString::into_param_string)
     }
 }
