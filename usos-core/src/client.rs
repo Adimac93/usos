@@ -5,6 +5,7 @@ use std::{
     ops::Deref,
 };
 
+use anyhow::{anyhow, bail};
 use reqwest::{header::CONTENT_TYPE, RequestBuilder, Response, StatusCode};
 use serde::{Serialize, Serializer};
 use serde_json::{json, Value};
@@ -120,15 +121,14 @@ impl<'a> UsosRequestBuilder<'a> {
     }
 
     fn payload<T: Serialize>(mut self, payload: T) -> Self {
-        let form_payload = match serde_urlencoded::to_string(payload) {
-            Ok(p) => p,
+        match serde_urlencoded::to_string(payload) {
+            Ok(form_payload) => {
+                self.form.payload = Some(form_payload);
+            }
             Err(e) => {
                 self.form.payload_error = Some(e);
-                return self;
             }
-        };
-
-        self.form.payload = Some(form_payload);
+        }
         self
     }
 
@@ -138,11 +138,6 @@ impl<'a> UsosRequestBuilder<'a> {
         access_token: Option<&'a AccessToken>,
     ) -> Self {
         self.form.auth = Some((consumer_key, access_token));
-        self
-    }
-
-    fn query<Q: Serialize + ?Sized>(mut self, query: &Q) -> Self {
-        self.request_builder = self.request_builder.query(query);
         self
     }
 
@@ -180,14 +175,20 @@ impl<'a> UsosRequestBuilder<'a> {
                 message: error,
             });
         }
-        if status.is_success() {
+        if status.is_server_error() {
+            println!("Internal server error");
+        }
+
+        if status.is_redirection() {
             return Ok(response);
         }
 
-        if response.status().is_server_error() {
-            println!("Internal server error");
+        if status.is_informational() {
+            return Err(AppError::Unexpected(anyhow!(
+                "Status codes 100-199 are unexpected"
+            )));
         }
-        unimplemented!()
+        return Ok(response);
     }
 
     async fn request_json(mut self) -> Result<Value, AppError> {
