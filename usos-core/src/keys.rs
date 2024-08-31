@@ -43,13 +43,16 @@ impl ConsumerKey {
         email: &str,
     ) -> crate::Result<Self> {
         let form = RegistrationForm::new(app_name, website_url, email);
-        let response = CLIENT.get(UsosUri::with_path("developers")).send().await?;
+        let response = reqwest::Client::new()
+            .get(UsosUri::with_path("developers"))
+            .send()
+            .await?;
         let csrf_token_cookie = response
             .cookies()
             .next()
             .context("Csrf token cookie expected but not found")?;
 
-        let response = CLIENT
+        let response = reqwest::Client::new()
             .post(UsosUri::with_path("developers/submit"))
             .header(COOKIE, &format!("csrftoken={}", csrf_token_cookie.value()))
             .header(HOST, UsosUri::DOMAIN)
@@ -77,10 +80,12 @@ impl ConsumerKey {
     }
 
     pub async fn revoke(self) -> crate::Result<()> {
-        let form = RevokeForm::new(self.key, self.secret.expose_secret());
-        let response = CLIENT
-            .get(UsosUri::with_path("services/oauth/revoke_consumer_key"))
-            .query(&form)
+        let response = reqwest::Client::new()
+            .post("oauth/revoke_customer_key")
+            .form(&[
+                ("consumer_key", &*self.key),
+                ("consumer_secret", &*self.secret.expose_secret()),
+            ])
             .send()
             .await?;
 
@@ -151,21 +156,6 @@ impl RegistrationResponse {
             status: status.into(),
             consumer_key: client_id.into(),
             consumer_secret: client_secret.into(),
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct RevokeForm {
-    consumer_key: String,
-    consumer_secret: String,
-}
-
-impl RevokeForm {
-    fn new(consumer_key: impl Into<String>, consumer_secret: impl Into<String>) -> Self {
-        Self {
-            consumer_key: consumer_key.into(),
-            consumer_secret: consumer_secret.into(),
         }
     }
 }
