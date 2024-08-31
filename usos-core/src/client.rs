@@ -1,6 +1,6 @@
 use std::{
     cell::LazyCell,
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fmt::{format, Debug},
     ops::Deref,
 };
@@ -30,13 +30,14 @@ impl UsosUri {
     }
 }
 
+#[derive(Debug)]
 pub struct Client {
     base_url: &'static str,
     client: reqwest::Client,
 }
 
 impl Client {
-    fn new(base_url: &'static str) -> Self {
+    pub fn new(base_url: &'static str) -> Self {
         let client = reqwest::Client::builder()
             .user_agent(format!(
                 "{}/{}",
@@ -50,20 +51,15 @@ impl Client {
         Self { base_url, client }
     }
 
-    fn builder(&self, uri: String) -> UsosRequestBuilder {
-        UsosRequestBuilder::new(&self.client, format!("{}/services/{uri}", self.base_url))
+    pub fn builder(&self, uri: impl AsRef<str>) -> UsosRequestBuilder {
+        UsosRequestBuilder::new(
+            &self.client,
+            format!("{}/services/{}", self.base_url, uri.as_ref()),
+        )
     }
 }
 
-impl Deref for Client {
-    type Target = reqwest::Client;
-
-    fn deref(&self) -> &Self::Target {
-        &self.client
-    }
-}
-
-pub const CLIENT: LazyCell<Client> = LazyCell::new(|| Client::new("https://apps.usos.pwr.edu.pl/"));
+pub const CLIENT: LazyCell<Client> = LazyCell::new(|| Client::new("https://apps.usos.pwr.edu.pl"));
 
 #[async_trait::async_trait]
 pub trait UsosDebug {
@@ -83,14 +79,14 @@ impl UsosDebug for reqwest::Response {
 
 #[derive(Default)]
 struct Form<'a> {
-    payload: Option<HashMap<String, String>>,
+    payload: Option<BTreeMap<String, String>>,
     auth: Option<(&'a ConsumerKey, Option<&'a AccessToken>)>,
     payload_error: Option<serde_urlencoded::ser::Error>,
 }
 
 impl<'a> Form<'a> {
     fn new(
-        payload: Option<HashMap<String, String>>,
+        payload: Option<BTreeMap<String, String>>,
         auth: Option<(&'a ConsumerKey, Option<&'a AccessToken>)>,
     ) -> Self {
         Self {
@@ -101,7 +97,7 @@ impl<'a> Form<'a> {
     }
 }
 
-struct UsosRequestBuilder<'a> {
+pub struct UsosRequestBuilder<'a> {
     request_builder: reqwest::RequestBuilder,
     uri: String,
     form: Form<'a>,
@@ -116,12 +112,12 @@ impl<'a> UsosRequestBuilder<'a> {
         }
     }
 
-    fn payload<T: IntoParams>(mut self, payload: T) -> Self {
+    pub fn payload<T: IntoParams>(mut self, payload: T) -> Self {
         self.form.payload = Some(payload.into_params());
         self
     }
 
-    fn auth(
+    pub fn auth(
         mut self,
         consumer_key: &'a ConsumerKey,
         access_token: Option<&'a AccessToken>,
@@ -130,7 +126,7 @@ impl<'a> UsosRequestBuilder<'a> {
         self
     }
 
-    async fn request(mut self) -> Result<Response, AppError> {
+    pub async fn request(mut self) -> Result<Response, AppError> {
         if let Some(e) = self.form.payload_error {
             // TODO: handle invalid form error
             return Err(AppError::Unexpected(anyhow::anyhow!(e)));
@@ -140,7 +136,7 @@ impl<'a> UsosRequestBuilder<'a> {
             Some((consumer_key, token)) => {
                 authorize("POST", &self.uri, consumer_key, token, self.form.payload)
             }
-            None => self.form.payload.unwrap_or_else(HashMap::new),
+            None => self.form.payload.unwrap_or_else(BTreeMap::new),
         };
 
         self.request_builder = self.request_builder.form(&signed_form);
@@ -176,7 +172,7 @@ impl<'a> UsosRequestBuilder<'a> {
         return Ok(response);
     }
 
-    async fn request_json(mut self) -> Result<Value, AppError> {
+    pub async fn request_json(mut self) -> Result<Value, AppError> {
         let res = self.request().await?;
         Ok(res.json().await?)
     }
@@ -184,10 +180,16 @@ impl<'a> UsosRequestBuilder<'a> {
 
 #[tokio::test]
 async fn test_usos_client() {
+    dotenvy::dotenv().ok();
+    let consumer_key = ConsumerKey::from_env().unwrap();
     let client = Client::new("https://apps.usos.pw.edu.pl");
     let response = client
-        .builder("apiref/method".into())
-        .payload([("name", "services/apiref/method"), ("fields", "id|name")])
+        .builder("apiref/method")
+        .payload([
+            ("fields", "name|short_name"),
+            ("name", "services/apiref/method"),
+        ])
+        .auth(&consumer_key, None)
         .request_json()
         .await
         .unwrap();

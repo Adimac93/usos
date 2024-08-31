@@ -32,15 +32,16 @@ pub async fn acquire_request_token(
     scopes: Scopes,
 ) -> crate::Result<OAuthRequestToken> {
     let callback = callback.unwrap_or("oob".into());
-    let url = UsosUri::with_path("services/oauth/request_token");
 
-    let params = Params::from(HashMap::from([
-        ("oauth_callback".into(), callback.clone()),
-        ("scopes".into(), scopes.to_string()),
-    ]))
-    .sign("POST", &url, Some(consumer_key), None);
-
-    unimplemented!();
+    let body = CLIENT
+        .builder("oauth/request_token")
+        .payload([("oauth_callback", callback), ("scopes", scopes.to_string())])
+        .auth(consumer_key, None)
+        .request()
+        .await?
+        .text()
+        .await?;
+    println!("{:?}", *CLIENT);
 
     let mut params = parse_ampersand_params(body)?;
 
@@ -65,19 +66,20 @@ pub async fn acquire_access_token(
     request_token: OAuthRequestToken,
     verifier: impl Into<String>,
 ) -> crate::Result<AccessToken> {
-    let url = UsosUri::with_path("services/oauth/access_token");
-
-    let params = Params::from(HashMap::from([("oauth_verifier".into(), verifier.into())])).sign(
-        "POST",
-        &url,
-        Some(consumer_key),
-        Some(&AccessToken {
-            token: request_token.token,
-            secret: request_token.secret,
-        }),
-    );
-
-    unimplemented!();
+    let body = CLIENT
+        .builder("oauth/access_token")
+        .payload([("oauth_verifier", verifier.into())])
+        .auth(
+            consumer_key,
+            Some(&AccessToken {
+                token: request_token.token,
+                secret: request_token.secret,
+            }),
+        )
+        .request()
+        .await?
+        .text()
+        .await?;
 
     let mut params = parse_ampersand_params(body)?;
 
