@@ -1,6 +1,5 @@
 use serde::Deserialize;
-
-use crate::client::{UsosUri, CLIENT};
+use usos_core::client::{UsosUri, CLIENT};
 
 /// apiref/method_index
 ///

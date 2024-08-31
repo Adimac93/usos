@@ -1,8 +1,6 @@
-use std::fmt::Display;
-
 use serde::Deserialize;
-
-use crate::client::{UsosUri, CLIENT};
+use std::fmt::Display;
+use usos_core::client::{UsosUri, CLIENT};
 
 /// apiref/module
 ///

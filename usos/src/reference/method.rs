@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
-use crate::{
-    api::scopes::Scope,
+use usos_core::{
+    api::types::scopes::Scope,
     client::{UsosUri, CLIENT},
 };
 /// apiref/method

@@ -1,11 +1,11 @@
-use crate::{
+use anyhow::Context;
+use serde::Deserialize;
+use serde_json::Value;
+use usos_core::{
     api::types::time::UsosPreciseDateTime,
     api::util::Process,
     client::{UsosUri, CLIENT},
 };
-use anyhow::Context;
-use serde::Deserialize;
-use serde_json::Value;
 
 /// services/apisrv/now
 ///
@@ -16,7 +16,7 @@ use serde_json::Value;
 /// Scopes: []
 ///
 /// SSL: false
-pub async fn get_usos_server_time() -> crate::Result<UsosPreciseDateTime> {
+pub async fn get_usos_server_time() -> usos_core::Result<UsosPreciseDateTime> {
     let url = UsosUri::with_path("services/apisrv/now");
 
     let body = UsosPreciseDateTime::deserialize(CLIENT.get(&url).process_as_json::<Value>().await?)

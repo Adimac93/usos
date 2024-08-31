@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 
 use crate::{api::errors::UsosError, errors::AppError};
 
-pub(crate) trait Process
+pub trait Process
 where
     Self: Sized,
 {

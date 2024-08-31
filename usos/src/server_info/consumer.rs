@@ -1,15 +1,15 @@
-use crate::api::auth::AccessToken;
-use crate::api::params::Params;
-use crate::api::scopes::Scope;
-use crate::api::types::time::UsosDateTime;
-use crate::api::util::Selector;
-use crate::keys::ConsumerKey;
-use crate::{
+use serde::Deserialize;
+use serde_json::Value;
+use usos_core::api::auth::AccessToken;
+use usos_core::api::params::Params;
+use usos_core::api::types::scopes::Scope;
+use usos_core::api::types::time::UsosDateTime;
+use usos_core::api::util::Selector;
+use usos_core::keys::ConsumerKey;
+use usos_core::{
     api::util::Process,
     client::{UsosUri, CLIENT},
 };
-use serde::Deserialize;
-use serde_json::Value;
 
 #[derive(Deserialize, Debug)]
 pub struct ConsumerInfo {
@@ -35,7 +35,7 @@ pub async fn get_consumer_info(
     consumer_key: &ConsumerKey,
     token: Option<AccessToken>,
     fields: impl Into<Selector>,
-) -> crate::Result<Value> {
+) -> usos_core::Result<Value> {
     let url = UsosUri::with_path("services/apisrv/consumer");
     let mut params = Params::new();
 

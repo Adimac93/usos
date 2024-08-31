@@ -1,12 +1,8 @@
-use std::{collections::HashMap, ops::Deref};
-
 use serde::{Deserialize, Deserializer};
-use serde_json::{json, Value};
-
-use crate::{
-    api::types::language::LanguageDictionary,
-    client::{UsosDebug, CLIENT},
-};
+use serde_json::Value;
+use std::{collections::HashMap, ops::Deref};
+use usos_core::api::types::language::LanguageDictionary;
+use usos_core::client::{UsosDebug, CLIENT};
 
 /// fac/faculty
 ///

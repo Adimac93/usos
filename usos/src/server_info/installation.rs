@@ -1,10 +1,12 @@
-use crate::{
-    api::util::{Process, Selector},
-    api::{faculties::faculty::Faculty, params::Params, types::language::LanguageDictionary},
-    client::{UsosUri, CLIENT},
-};
 use serde::Deserialize;
 use serde_json::Value;
+use usos_core::{
+    api::util::{Process, Selector},
+    api::{params::Params, types::language::LanguageDictionary},
+    client::{UsosUri, CLIENT},
+};
+
+use crate::faculties::faculty::Faculty;
 
 #[derive(Deserialize, Debug)]
 pub struct Installation {
@@ -31,7 +33,7 @@ pub struct Installation {
 /// Scopes: []
 ///
 /// SSL: false
-pub async fn get_installation_info(fields: Option<Selector>) -> crate::Result<Value> {
+pub async fn get_installation_info(fields: Option<Selector>) -> usos_core::Result<Value> {
     let url = UsosUri::with_path("services/apisrv/installation");
     let mut params = Params::new();
 

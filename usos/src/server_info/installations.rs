@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::{
+use usos_core::{
     api::types::language::LanguageDictionary,
     api::util::Process,
     client::{UsosUri, CLIENT},
@@ -23,7 +23,7 @@ pub struct InstallationListItem {
 /// Scopes: []
 ///
 /// SSL: false
-pub async fn get_installations() -> crate::Result<Vec<InstallationListItem>> {
+pub async fn get_installations() -> usos_core::Result<Vec<InstallationListItem>> {
     let url = UsosUri::with_path("services/apisrv/installations");
 
     let body = CLIENT.get(&url).process_as_json().await?;

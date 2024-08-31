@@ -3,7 +3,7 @@ use std::{
     fmt::{self, write, Display, Formatter},
 };
 
-use super::scopes::Scope;
+use super::types::scopes::Scope;
 use kind::ErrorKind;
 use reason::Reason;
 use serde::Deserialize;

@@ -1,12 +1,7 @@
-use std::fmt::{self, Display, Formatter};
-
 use serde::Deserialize;
-use serde_json::Value;
-
-use crate::{
-    api::types::language::Language,
-    client::{UsosDebug, CLIENT},
-};
+use std::fmt::{self, Display, Formatter};
+use usos_core::api::types::language::Language;
+use usos_core::client::{UsosDebug, CLIENT};
 
 /// fac/faculty
 ///

@@ -8,13 +8,13 @@ use secrecy::SecretString;
 
 use crate::{
     api::util::{parse_ampersand_params, Process},
-    api::{oauth1::authorize, params::Params, scopes::Scope},
+    api::{oauth1::authorize, params::Params, types::scopes::Scope},
     client::{UsosUri, CLIENT},
     errors::AppError,
     keys::ConsumerKey,
 };
 
-use super::scopes::Scopes;
+use super::types::scopes::Scopes;
 
 pub struct OAuthRequestToken {
     token: String,
