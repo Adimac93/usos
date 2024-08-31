@@ -11,7 +11,7 @@ const OAUTH_VERSION: &str = "1.0";
 use crate::keys::ConsumerKey;
 
 use super::auth::AccessToken;
-use super::params::IntoParams;
+use super::params::Params;
 
 fn rand_alphanumeric_string(target_len: usize) -> String {
     Alphanumeric
@@ -26,9 +26,9 @@ pub fn authorize<'a>(
     uri: &str,
     consumer: &ConsumerKey,
     token: Option<&AccessToken>,
-    params: impl IntoParams,
+    params: impl Into<Params>,
 ) -> BTreeMap<String, String> {
-    let mut params = params.into_params();
+    let mut params = params.into();
     let timestamp = time::OffsetDateTime::now_utc().unix_timestamp().to_string();
 
     let nonce: String = rand_alphanumeric_string(NONCE_LENGTH);
@@ -52,7 +52,7 @@ pub fn authorize<'a>(
 
     params.insert("oauth_signature".into(), signature.into());
 
-    params
+    params.0
 }
 
 // Encode all but the unreserved characters defined in

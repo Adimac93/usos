@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use std::fmt::Display;
-use usos_core::client::{UsosUri, CLIENT};
+use usos_core::client::CLIENT;
 
 /// apiref/module
 ///
@@ -11,17 +11,7 @@ use usos_core::client::{UsosUri, CLIENT};
 /// Scopes: n/a
 ///
 /// SSL: not required
-pub async fn get_module_info(module_name: Module) -> ModuleInfo {
-    let response = CLIENT
-        .get(UsosUri::with_path("services/apiref/module"))
-        .query(&[("name", format!("services/{module_name}"))])
-        .send()
-        .await
-        .unwrap();
-
-    let json = response.json::<ModuleInfo>().await.unwrap();
-    json
-}
+pub async fn get_module_info(module_name: Module) {}
 
 #[tokio::test]
 #[ignore]

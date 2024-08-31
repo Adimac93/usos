@@ -2,7 +2,7 @@ use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use std::{collections::HashMap, ops::Deref};
 use usos_core::api::types::language::LanguageDictionary;
-use usos_core::client::{UsosDebug, CLIENT};
+use usos_core::client::CLIENT;
 
 /// fac/faculty
 ///
@@ -13,27 +13,7 @@ use usos_core::client::{UsosDebug, CLIENT};
 /// Scopes: n/a
 ///
 /// SSL: not required
-pub async fn get_faculty(faculty_id: &str) -> Value {
-    let response = CLIENT
-        .get("https://apps.usos.pwr.edu.pl/services/fac/faculty")
-        .query(&[("fac_id", faculty_id), ("fields", "id|name|profile_url|homepage_url|phone_numbers|phone_numbers2|postal_address|email|is_public|static_map_urls")])
-        .send()
-        .await
-        .unwrap()
-        .debug()
-        .await
-        .unwrap();
-
-    let mut json = response.json::<Value>().await.unwrap();
-    json
-}
-
-#[tokio::test]
-#[ignore]
-async fn test_get_faculty() {
-    let faculty = get_faculty("K30W04ND03").await;
-    println!("{faculty}");
-}
+pub async fn get_faculty(faculty_id: &str) {}
 
 #[derive(Debug, Deserialize)]
 pub struct Faculty {

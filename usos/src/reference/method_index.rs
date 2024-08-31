@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use usos_core::client::{UsosUri, CLIENT};
+use usos_core::client::CLIENT;
 
 /// apiref/method_index
 ///
@@ -10,20 +10,7 @@ use usos_core::client::{UsosUri, CLIENT};
 /// Scopes: n/a
 ///
 /// SSL: not required
-pub async fn get_method_index() -> Vec<MethodBrief> {
-    let response = CLIENT
-        .get(UsosUri::with_path("services/apiref/method_index"))
-        .send()
-        .await
-        .unwrap();
-
-    let mut json = response.json::<Vec<MethodBrief>>().await.unwrap();
-    json.iter_mut().for_each(|method| {
-        method.name = method.name.split_once('/').unwrap().1.to_string();
-        method.brief_description = method.brief_description.trim().to_string();
-    });
-    json
-}
+pub async fn get_method_index() {}
 
 #[tokio::test]
 #[ignore]

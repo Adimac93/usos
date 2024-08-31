@@ -1,10 +1,6 @@
 use serde::Deserialize;
 
-use usos_core::{
-    api::types::language::LanguageDictionary,
-    api::util::Process,
-    client::{UsosUri, CLIENT},
-};
+use usos_core::{api::types::language::LanguageDictionary, client::CLIENT};
 
 #[derive(Deserialize, Debug)]
 pub struct InstallationListItem {
@@ -23,23 +19,4 @@ pub struct InstallationListItem {
 /// Scopes: []
 ///
 /// SSL: false
-pub async fn get_installations() -> usos_core::Result<Vec<InstallationListItem>> {
-    let url = UsosUri::with_path("services/apisrv/installations");
-
-    let body = CLIENT.get(&url).process_as_json().await?;
-    Ok(body)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    #[ignore]
-    async fn health_check() {
-        let res = get_installations().await.unwrap();
-        let res: Vec<InstallationListItem> =
-            res.into_iter().filter(|x| x.version.is_none()).collect();
-        println!("{res:?}");
-    }
-}
+pub async fn get_installations() {}

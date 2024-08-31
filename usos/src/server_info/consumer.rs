@@ -5,11 +5,8 @@ use usos_core::api::params::Params;
 use usos_core::api::types::scopes::Scope;
 use usos_core::api::types::time::UsosDateTime;
 use usos_core::api::util::Selector;
+use usos_core::client::CLIENT;
 use usos_core::keys::ConsumerKey;
-use usos_core::{
-    api::util::Process,
-    client::{UsosUri, CLIENT},
-};
 
 #[derive(Deserialize, Debug)]
 pub struct ConsumerInfo {
@@ -35,33 +32,5 @@ pub async fn get_consumer_info(
     consumer_key: &ConsumerKey,
     token: Option<AccessToken>,
     fields: impl Into<Selector>,
-) -> usos_core::Result<Value> {
-    let url = UsosUri::with_path("services/apisrv/consumer");
-    let mut params = Params::new();
-
-    params = params.add("fields", fields.into());
-
-    params = params.sign("GET", &url, Some(consumer_key), token.as_ref());
-
-    let body = CLIENT.get(&url).query(&params).process_as_json().await?;
-    Ok(body)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    #[ignore]
-    async fn health_check() {
-        dotenvy::dotenv().ok();
-        let consumer_key = ConsumerKey::from_env().unwrap();
-
-        let fields =
-            "name|url|email|date_registered|administrative_methods|token_scopes".to_string();
-        let res = get_consumer_info(&consumer_key, None, fields)
-            .await
-            .unwrap();
-        println!("{res:?}");
-    }
+) {
 }
