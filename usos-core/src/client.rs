@@ -61,22 +61,6 @@ impl Client {
 
 pub const CLIENT: LazyCell<Client> = LazyCell::new(|| Client::new("https://apps.usos.pwr.edu.pl"));
 
-#[async_trait::async_trait]
-pub trait UsosDebug {
-    async fn debug(self) -> Result<Response, UsosError>;
-}
-
-#[async_trait::async_trait]
-impl UsosDebug for reqwest::Response {
-    async fn debug(self) -> Result<Response, UsosError> {
-        if self.status().is_client_error() {
-            let error = self.json::<UsosError>().await.unwrap();
-            return Err(error);
-        }
-        Ok(self)
-    }
-}
-
 #[derive(Default)]
 struct Form<'a> {
     payload: Option<BTreeMap<String, String>>,
