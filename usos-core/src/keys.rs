@@ -1,7 +1,7 @@
 use std::{env::VarError, path::Path};
 
 use anyhow::Context;
-use fantoccini::{error::CmdError, Locator};
+use reqwest::header::{COOKIE, HOST, ORIGIN, REFERER};
 use secrecy::{ExposeSecret, Secret, SecretString};
 use serde::{Deserialize, Serialize};
 use time::macros::format_description;
@@ -23,6 +23,10 @@ pub struct ConsumerKey {
 }
 
 impl ConsumerKey {
+    pub fn new(key: String, secret: SecretString, owner: Option<String>) -> Self {
+        Self { key, secret, owner }
+    }
+
     pub fn from_env() -> Result<Self, VarError> {
         let key = std::env::var(CONSUMER_KEY_NAME)?;
         let secret = SecretString::new(std::env::var(CONSUMER_SECRET_NAME)?);
@@ -47,13 +51,10 @@ impl ConsumerKey {
 
         let response = CLIENT
             .post(UsosUri::with_path("developers/submit"))
-            .header(
-                "Cookie",
-                &format!("csrftoken={}", csrf_token_cookie.value()),
-            )
-            .header("Host", UsosUri::DOMAIN)
-            .header("Origin", UsosUri::origin())
-            .header("Referer", UsosUri::with_path("developers"))
+            .header(COOKIE, &format!("csrftoken={}", csrf_token_cookie.value()))
+            .header(HOST, UsosUri::DOMAIN)
+            .header(ORIGIN, UsosUri::origin())
+            .header(REFERER, UsosUri::with_path("developers"))
             .header("X-CSRFToken", csrf_token_cookie.value())
             .form(&form)
             .send()
@@ -167,76 +168,4 @@ impl RevokeForm {
             consumer_secret: consumer_secret.into(),
         }
     }
-}
-
-pub async fn gen_consumer_keys(
-    app_name: &str,
-    website_url: Option<&str>,
-    email: &str,
-) -> Result<(String, Secret<String>), CmdError> {
-    let client = fantoccini::ClientBuilder::native()
-        .connect("http://localhost:4444")
-        .await
-        .unwrap();
-
-    client.goto(&UsosUri::with_path("developers")).await?;
-    client
-        .find(Locator::Id("appname"))
-        .await?
-        .send_keys(app_name)
-        .await?;
-
-    client
-        .find(Locator::Id("appurl"))
-        .await?
-        .send_keys(website_url.unwrap_or_default())
-        .await?;
-
-    client
-        .find(Locator::Id("email"))
-        .await?
-        .send_keys(email)
-        .await?;
-
-    client.find(Locator::Id("submit")).await?.click().await?;
-
-    let consumer_key = client
-        .wait()
-        .for_element(Locator::Id("kkey"))
-        .await?
-        .text()
-        .await?;
-
-    let consumer_secret = client.find(Locator::Id("ksecret")).await?.text().await?;
-
-    client.close().await?;
-    Ok((consumer_key, Secret::new(consumer_secret)))
-}
-
-async fn revoke_consumer_keys(consumer_key: &str, consumer_secret: &str) -> Result<(), CmdError> {
-    let client = fantoccini::ClientBuilder::native()
-        .connect("http://localhost:4444")
-        .await
-        .unwrap();
-
-    client.goto(&UsosUri::with_path("developers")).await?;
-    client
-        .find(Locator::Id("consumer_key"))
-        .await?
-        .send_keys(consumer_key)
-        .await?;
-
-    client
-        .find(Locator::Id("consumer_secret"))
-        .await?
-        .send_keys(consumer_secret)
-        .await?;
-
-    client.find(Locator::Id("revoke")).await?.click().await?;
-    client.accept_alert().await?;
-
-    client.close().await?;
-
-    println!("Check your email for confirmation.");
-    Ok(())
 }

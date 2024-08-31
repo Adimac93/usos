@@ -4,7 +4,6 @@ pub mod api;
 pub mod client;
 pub mod errors;
 pub mod keys;
-pub mod webdriver;
 
 // should stay in projecet root, see issue https://github.com/time-rs/time/issues/597
 time::serde::format_description!(date_string, Date, api::types::time::DATE_FORMAT);
