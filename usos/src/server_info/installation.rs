@@ -1,9 +1,9 @@
 use serde::Deserialize;
 use serde_json::Value;
 use usos_core::{
-    api::util::{Process, Selector},
+    api::util::Selector,
     api::{params::Params, types::language::LanguageDictionary},
-    client::{UsosUri, CLIENT},
+    client::CLIENT,
 };
 
 use crate::faculties::faculty::Faculty;
@@ -33,27 +33,4 @@ pub struct Installation {
 /// Scopes: []
 ///
 /// SSL: false
-pub async fn get_installation_info(fields: Option<Selector>) -> usos_core::Result<Value> {
-    let url = UsosUri::with_path("services/apisrv/installation");
-    let mut params = Params::new();
-
-    if let Some(fields) = fields {
-        params = params.add("fields", fields);
-    }
-
-    let body = CLIENT.get(&url).query(&params).process_as_json().await?;
-    Ok(body)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    #[ignore]
-    async fn health_check() {
-        let fields = "base_url|version|machine_version|usos_schema_version|institution_name|institution[id|name|profile_url|homepage_url|phone_numbers|phone_numbers2|postal_address|email|is_public|static_map_urls]|contact_emails|schac_id|mcards_support".to_string();
-        let res = get_installation_info(Some(fields)).await.unwrap();
-        println!("{res:?}");
-    }
-}
+pub async fn get_installation_info(fields: Option<Selector>) {}

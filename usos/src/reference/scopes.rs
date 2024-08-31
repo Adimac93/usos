@@ -1,8 +1,5 @@
 use serde::Deserialize;
-use usos_core::{
-    api::types::scopes::Scope,
-    client::{UsosUri, CLIENT},
-};
+use usos_core::{api::types::scopes::Scope, client::CLIENT};
 
 /// apiref/scopes
 ///
@@ -14,11 +11,7 @@ use usos_core::{
 ///
 /// SSL: not required
 pub async fn get_scopes() -> Vec<ApiScope> {
-    let response = CLIENT
-        .get(UsosUri::with_path("services/apiref/scopes"))
-        .send()
-        .await
-        .unwrap();
+    let response = CLIENT.builder("apiref/scopes").request().await.unwrap();
 
     let mut scopes: Vec<ApiScope> = response.json().await.unwrap();
 

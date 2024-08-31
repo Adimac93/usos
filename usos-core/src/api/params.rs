@@ -1,77 +1,109 @@
-use std::collections::BTreeMap;
-
-use serde::Serialize;
-
-use crate::keys::ConsumerKey;
-
 use super::{auth::AccessToken, oauth1::authorize};
+use crate::keys::ConsumerKey;
+use serde::Serialize;
+use std::{
+    collections::BTreeMap,
+    ops::{Deref, DerefMut},
+};
+pub struct Params(pub BTreeMap<String, String>);
 
-pub trait IntoParams {
-    fn into_params(self) -> BTreeMap<String, String>;
-}
+impl Deref for Params {
+    type Target = BTreeMap<String, String>;
 
-impl IntoParams for () {
-    fn into_params(self) -> BTreeMap<String, String> {
-        BTreeMap::new()
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
-impl<T, U> IntoParams for (T, U)
+impl DerefMut for Params {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl From<()> for Params {
+    fn from(_: ()) -> Self {
+        Self(BTreeMap::new())
+    }
+}
+
+impl<T, U> From<(T, U)> for Params
 where
     T: Into<String>,
-    U: IntoParamString,
+    U: Into<ParamString>,
 {
-    fn into_params(self) -> BTreeMap<String, String> {
-        BTreeMap::from([(self.0.into(), self.1.into_param_string())])
+    fn from(value: (T, U)) -> Self {
+        Self(BTreeMap::from([(value.0.into(), value.1.into().0)]))
     }
 }
 
-impl<T, U, const N: usize> IntoParams for [(T, U); N]
+impl<T, U, const N: usize> From<[(T, U); N]> for Params
+where
+    T: Into<String> + Ord,
+    U: Into<ParamString>,
+{
+    fn from(value: [(T, U); N]) -> Self {
+        Self(BTreeMap::from_iter(
+            value
+                .into_iter()
+                .map(|pair| (pair.0.into(), pair.1.into().0)),
+        ))
+    }
+}
+
+// FXIME
+// impl<T, U, const N: usize> From<&[(T, U); N]> for Params
+// where
+//     T: Into<String>,
+//     U: Into<String>,
+// {
+//     fn from(value: &[(T, U); N]) -> Self {
+//         Self(BTreeMap::from_iter(
+//             value.into_iter().map(|pair| (pair.0.into(), pair.1.into())),
+//         ))
+//     }
+// }
+
+impl<T, U> From<BTreeMap<T, U>> for Params
 where
     T: Into<String>,
-    U: IntoParamString,
+    U: Into<ParamString>,
 {
-    fn into_params(self) -> BTreeMap<String, String> {
-        BTreeMap::from_iter(
-            self.into_iter()
-                .map(|pair| (pair.0.into(), pair.1.into_param_string())),
-        )
+    fn from(value: BTreeMap<T, U>) -> Self {
+        Self(BTreeMap::from_iter(
+            value
+                .into_iter()
+                .map(|pair| (pair.0.into(), pair.1.into().0)),
+        ))
     }
 }
 
-impl<T, U> IntoParams for BTreeMap<T, U>
+impl<T, U> From<Option<BTreeMap<T, U>>> for Params
 where
-    T: Into<String>,
-    U: IntoParamString,
+    BTreeMap<T, U>: Into<Params>,
 {
-    fn into_params(self) -> BTreeMap<String, String> {
-        BTreeMap::from_iter(
-            self.into_iter()
-                .map(|pair| (pair.0.into(), pair.1.into_param_string())),
-        )
+    fn from(value: Option<BTreeMap<T, U>>) -> Self {
+        value.map_or_else(|| Self(BTreeMap::new()), Into::into)
     }
 }
 
-impl<T, U> IntoParams for Option<BTreeMap<T, U>>
-where
-    BTreeMap<T, U>: IntoParams,
-{
-    fn into_params(self) -> BTreeMap<String, String> {
-        self.map_or_else(BTreeMap::new, |x| x.into_params())
-    }
-}
+pub struct ParamString(String);
 
-pub trait IntoParamString {
-    fn into_param_string(self) -> String;
+impl Deref for ParamString {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 macro_rules! impl_into_param_string(
     ($($x:ty),*) => {
         $(
-            impl IntoParamString for $x {
-                fn into_param_string(self) -> String {
-                    self.to_string()
-                }
+            impl From<$x> for ParamString {
+                fn from(value: $x) -> Self {
+					Self(value.to_string())
+				}
             }
         )*
     }
@@ -80,12 +112,3 @@ macro_rules! impl_into_param_string(
 impl_into_param_string!(
     String, &str, u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize
 );
-
-impl<T> IntoParamString for Option<T>
-where
-    T: IntoParamString,
-{
-    fn into_param_string(self) -> String {
-        self.map_or_else(String::new, IntoParamString::into_param_string)
-    }
-}

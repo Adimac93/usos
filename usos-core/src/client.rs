@@ -11,7 +11,7 @@ use serde::{Serialize, Serializer};
 use serde_json::{json, Value};
 
 use crate::{
-    api::{auth::AccessToken, errors::UsosError, oauth1::authorize, params::IntoParams},
+    api::{auth::AccessToken, errors::UsosError, oauth1::authorize, params::Params},
     errors::AppError,
     keys::ConsumerKey,
 };
@@ -86,8 +86,8 @@ impl<'a> UsosRequestBuilder<'a> {
         }
     }
 
-    pub fn payload<T: IntoParams>(mut self, payload: T) -> Self {
-        self.form.payload = Some(payload.into_params());
+    pub fn payload<T: Into<Params>>(mut self, payload: T) -> Self {
+        self.form.payload = Some(payload.into().0);
         self
     }
 

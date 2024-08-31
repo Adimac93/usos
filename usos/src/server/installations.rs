@@ -9,16 +9,7 @@ use usos_core::{api::types::language::LanguageDictionary, client::CLIENT};
 /// Scopes: n/a
 ///
 /// SSL: not required
-pub async fn get_installations() -> Vec<BulkInstallation> {
-    let response = CLIENT
-        .get("https://apps.usos.pwr.edu.pl/services/apisrv/installations")
-        .send()
-        .await
-        .unwrap();
-
-    let mut json = response.json::<Vec<BulkInstallation>>().await.unwrap();
-    json
-}
+pub async fn get_installations() {}
 
 #[derive(Debug, Deserialize)]
 struct BulkInstallation {

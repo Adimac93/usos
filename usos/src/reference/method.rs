@@ -1,9 +1,6 @@
 use serde::Deserialize;
 
-use usos_core::{
-    api::types::scopes::Scope,
-    client::{UsosUri, CLIENT},
-};
+use usos_core::{api::types::scopes::Scope, client::CLIENT};
 /// apiref/method
 ///
 /// Consumer: optional (required only for `admin_access`)
@@ -13,16 +10,7 @@ use usos_core::{
 /// Scopes: n/a
 ///
 /// SSL: not required
-pub async fn get_method_info(method_name: &str) -> MethodReference {
-    let response = CLIENT
-        .get(UsosUri::with_path("services/apiref/method"))
-        .query(&[("name", method_name)])
-        .send()
-        .await
-        .unwrap();
-
-    response.json().await.unwrap()
-}
+pub async fn get_method_info(method_name: &str) {}
 
 #[tokio::test]
 #[ignore]

@@ -3,7 +3,7 @@ use serde_json::Value;
 
 use usos_core::{
     api::{errors::UsosError, types::language::LanguageDictionary},
-    client::{UsosDebug, CLIENT},
+    client::CLIENT,
 };
 
 /// apisrv/installation
@@ -15,21 +15,7 @@ use usos_core::{
 /// Scopes: n/a
 ///
 /// SSL: not required
-pub async fn get_installation() -> Result<Installation, UsosError> {
-    let response = CLIENT
-        .get("https://apps.usos.pwr.edu.pl/services/apisrv/installation")
-        .query(&[("fields", "base_url|version|institution_name|contact_emails|machine_version|usos_schema_version|institution|schac_id|mcards_support")])
-        .send()
-        .await
-        .unwrap().debug().await.unwrap();
-
-    // if response.status().is_client_error() {
-    //     let error = response.json::<UsosError>().await.unwrap();
-    //     return Err(error);
-    // }
-    let json = response.json::<Installation>().await.unwrap();
-    Ok(json)
-}
+pub async fn get_installation() {}
 
 #[derive(Debug, Deserialize)]
 pub struct Installation {
