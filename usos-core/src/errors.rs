@@ -6,26 +6,25 @@ use crate::api::errors::UsosError;
 
 #[derive(Error, Debug)]
 pub enum AppError {
-    #[error("Http error {code} - {message}")]
+    #[error("Http error {code}")]
     Http {
         code: StatusCode,
-        message: UsosError,
+        message: Option<UsosError>,
     },
-    #[error("Called unknown method {0}")]
-    UnknownMethod(String),
-    #[error("Response parsing failed: {0}")]
-    Parse(String),
     #[error(transparent)]
     Unexpected(#[from] anyhow::Error),
 }
 
 impl AppError {
-    pub fn http(code: StatusCode, message: UsosError) -> Self {
+    pub fn http(code: StatusCode, message: Option<UsosError>) -> Self {
         Self::Http { code, message }
     }
 
-    pub fn parse(msg: impl Into<String>) -> Self {
-        Self::Parse(msg.into())
+    pub fn usos_error(&self) -> Option<&UsosError> {
+        match self {
+            Self::Http { message, .. } => message.as_ref(),
+            _ => None,
+        }
     }
 }
 

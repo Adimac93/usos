@@ -149,20 +149,19 @@ impl<'a> UsosRequestBuilder<'a> {
         let status = response.status();
         if status.is_client_error() {
             if status == StatusCode::NOT_FOUND {
-                return Err(AppError::UnknownMethod(self.uri));
+                return Err(AppError::http(status, None));
             }
             if status == StatusCode::UNAUTHORIZED {
                 println!("Unauthorized, token expired (session expired / user logged out / user revoked all tokens)");
+                return Err(AppError::http(status, None));
             }
             let error = response.json::<UsosError>().await?;
             println!("{}", error);
-            return Err(AppError::Http {
-                code: status,
-                message: error,
-            });
+            return Err(AppError::http(status, Some(error)));
         }
         if status.is_server_error() {
             println!("Internal server error");
+            return Err(AppError::http(status, None));
         }
 
         if status.is_redirection() {

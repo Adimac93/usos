@@ -7,8 +7,8 @@ use anyhow::Context;
 use secrecy::SecretString;
 
 use crate::{
-    api::util::{parse_ampersand_params, Process},
-    api::{oauth1::authorize, params::Params, types::scopes::Scope},
+    api::util::parse_ampersand_params,
+    api::{oauth1::authorize, types::scopes::Scope},
     client::{UsosUri, CLIENT},
     errors::AppError,
     keys::ConsumerKey,
@@ -40,13 +40,7 @@ pub async fn acquire_request_token(
     ]))
     .sign("POST", &url, Some(consumer_key), None);
 
-    let body = CLIENT
-        .post(&url)
-        .form(&params)
-        .process()
-        .await?
-        .text()
-        .await?;
+    unimplemented!();
 
     let mut params = parse_ampersand_params(body)?;
 
@@ -83,13 +77,7 @@ pub async fn acquire_access_token(
         }),
     );
 
-    let body = CLIENT
-        .post(&url)
-        .form(&params)
-        .process()
-        .await?
-        .text()
-        .await?;
+    unimplemented!();
 
     let mut params = parse_ampersand_params(body)?;
 

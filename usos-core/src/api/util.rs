@@ -5,41 +5,12 @@ use serde::de::DeserializeOwned;
 
 use crate::{api::errors::UsosError, errors::AppError};
 
-pub trait Process
-where
-    Self: Sized,
-{
-    async fn process(self) -> crate::Result<Response>;
-    async fn process_as_json<T: DeserializeOwned>(self) -> crate::Result<T>;
-}
-
-impl Process for reqwest::RequestBuilder {
-    async fn process(self) -> crate::Result<Response> {
-        let response = self.send().await?;
-
-        let status = response.status();
-
-        if status.is_client_error() || status.is_server_error() {
-            let error: UsosError = response.json().await?;
-
-            Err(AppError::http(status, error))
-        } else {
-            Ok(response)
-        }
-    }
-
-    async fn process_as_json<T: DeserializeOwned>(self) -> crate::Result<T> {
-        let response = self.process().await?;
-        Ok(response.json().await?)
-    }
-}
-
 pub(crate) fn parse_ampersand_params(
     text: impl Into<String>,
 ) -> Result<HashMap<String, String>, AppError> {
     let text = text.into();
     let mut res = HashMap::new();
-    let e = AppError::Parse(format!("Invalid ampersand params syntax: {text}"));
+    let e = AppError::Unexpected(anyhow::anyhow!("Invalid ampersand params syntax: {text}"));
 
     for keyval in text.split('&') {
         if let Some((key, val)) = keyval.split_once('=') {
