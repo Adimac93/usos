@@ -4,7 +4,7 @@ use rand::distributions::{Alphanumeric, Distribution};
 use rand::thread_rng;
 use ring::hmac::{self, HMAC_SHA1_FOR_LEGACY_USE_ONLY};
 use secrecy::{ExposeSecret, SecretString};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 const NONCE_LENGTH: usize = 32;
 const OAUTH_VERSION: &str = "1.0";
@@ -27,7 +27,7 @@ pub fn authorize<'a>(
     consumer: &ConsumerKey,
     token: Option<&AccessToken>,
     params: impl IntoParams,
-) -> HashMap<String, String> {
+) -> BTreeMap<String, String> {
     let mut params = params.into_params();
     let timestamp = time::OffsetDateTime::now_utc().unix_timestamp().to_string();
 
@@ -72,7 +72,7 @@ fn to_url_encoded(s: &str) -> String {
     percent_encoding::percent_encode(s.as_bytes(), &STRICT_ENCODE_SET).collect()
 }
 
-fn to_query(params: &HashMap<String, String>) -> String {
+fn to_query(params: &BTreeMap<String, String>) -> String {
     let mut pairs: Vec<_> = params
         .iter()
         .map(|(k, v)| format!("{}={}", to_url_encoded(k), to_url_encoded(v)))
