@@ -9,7 +9,7 @@ use secrecy::SecretString;
 use crate::{
     api::util::parse_ampersand_params,
     api::{oauth1::authorize, types::scopes::Scope},
-    client::{UsosUri, CLIENT},
+    client::CLIENT,
     errors::AppError,
     keys::ConsumerKey,
 };
@@ -103,9 +103,10 @@ pub async fn acquire_access_token(
 async fn get_pin(oauth_token: String) -> String {
     println!(
         "Please visit the following URL to authorize the application: {}",
-        UsosUri::with_path(&format!(
-            "services/oauth/authorize?oauth_token={oauth_token}"
-        ))
+        format!(
+            "{}services/oauth/authorize?oauth_token={oauth_token}",
+            CLIENT.base_url()
+        )
     );
 
     let mut buf = String::new();

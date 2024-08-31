@@ -16,20 +16,6 @@ use crate::{
     keys::ConsumerKey,
 };
 
-pub struct UsosUri;
-
-impl UsosUri {
-    pub const DOMAIN: &'static str = "apps.usos.pwr.edu.pl";
-
-    pub fn origin() -> String {
-        format!("https://{}/", Self::DOMAIN)
-    }
-
-    pub fn with_path(path: impl AsRef<str>) -> String {
-        format!("{}{}", Self::origin(), path.as_ref())
-    }
-}
-
 #[derive(Debug)]
 pub struct Client {
     base_url: &'static str,
@@ -56,6 +42,10 @@ impl Client {
             &self.client,
             format!("{}/services/{}", self.base_url, uri.as_ref()),
         )
+    }
+
+    pub fn base_url(&self) -> &str {
+        self.base_url
     }
 }
 

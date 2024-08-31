@@ -6,14 +6,26 @@ use secrecy::{ExposeSecret, Secret, SecretString};
 use serde::{Deserialize, Serialize};
 use time::macros::format_description;
 
-use crate::{
-    client::{UsosUri, CLIENT},
-    errors::AppError,
-};
+use crate::errors::AppError;
 
 const CONSUMER_KEY_NAME: &str = "USOS_CONSUMER_KEY";
 const CONSUMER_SECRET_NAME: &str = "USOS_CONSUMER_SECRET";
 const CONSUMER_KEY_OWNER: &str = "USOS_CONSUMER_EMAIL";
+
+/// Internal struct that serves as an abstraction over URIs used in keygen
+struct UsosUri;
+
+impl UsosUri {
+    pub const DOMAIN: &'static str = "apps.usos.pwr.edu.pl";
+
+    pub fn origin() -> String {
+        format!("https://{}/", Self::DOMAIN)
+    }
+
+    pub fn with_path(path: impl AsRef<str>) -> String {
+        format!("{}{}", Self::origin(), path.as_ref())
+    }
+}
 
 pub struct ConsumerKey {
     /// Developer email
