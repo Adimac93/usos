@@ -51,18 +51,19 @@ where
     }
 }
 
-// FXIME
-// impl<T, U, const N: usize> From<&[(T, U); N]> for Params
-// where
-//     T: Into<String>,
-//     U: Into<String>,
-// {
-//     fn from(value: &[(T, U); N]) -> Self {
-//         Self(BTreeMap::from_iter(
-//             value.into_iter().map(|pair| (pair.0.into(), pair.1.into())),
-//         ))
-//     }
-// }
+impl<T, U, const N: usize> From<&[(T, U); N]> for Params
+where
+    T: Into<String> + Clone,
+    U: Into<String> + Clone,
+{
+    fn from(value: &[(T, U); N]) -> Self {
+        Self(BTreeMap::from_iter(
+            value
+                .into_iter()
+                .map(|pair| (pair.0.clone().into(), pair.1.clone().into())),
+        ))
+    }
+}
 
 impl<T, U> From<BTreeMap<T, U>> for Params
 where

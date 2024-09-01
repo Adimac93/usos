@@ -5,6 +5,7 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+/// Message intended for the user, possibly containing information about validation errors.
 #[derive(Debug, Deserialize)]
 pub struct UserMessages {
     /// [`LanguageDictionary`] object, with the generic (context-free) message to be displayed for the user.
