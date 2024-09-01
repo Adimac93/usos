@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     io::Write,
+    sync::Arc,
 };
 
 use anyhow::Context;
@@ -27,7 +28,7 @@ pub struct AccessToken {
 }
 
 pub async fn acquire_request_token(
-    consumer_key: &ConsumerKey,
+    consumer_key: Arc<ConsumerKey>,
     callback: Option<String>,
     scopes: Scopes,
 ) -> crate::Result<OAuthRequestToken> {
@@ -36,7 +37,7 @@ pub async fn acquire_request_token(
     let body = CLIENT
         .builder("oauth/request_token")
         .payload([("oauth_callback", callback), ("scopes", scopes.to_string())])
-        .auth(consumer_key, None)
+        .auth(Some(consumer_key), None)
         .request()
         .await?
         .text()
@@ -62,7 +63,7 @@ pub async fn acquire_request_token(
 }
 
 pub async fn acquire_access_token(
-    consumer_key: &ConsumerKey,
+    consumer_key: Arc<ConsumerKey>,
     request_token: OAuthRequestToken,
     verifier: impl Into<String>,
 ) -> crate::Result<AccessToken> {
@@ -70,7 +71,7 @@ pub async fn acquire_access_token(
         .builder("oauth/access_token")
         .payload([("oauth_verifier", verifier.into())])
         .auth(
-            consumer_key,
+            Some(consumer_key),
             Some(&AccessToken {
                 token: request_token.token,
                 secret: request_token.secret,
@@ -119,9 +120,10 @@ async fn get_pin(oauth_token: String) -> String {
 }
 
 #[cfg(test)]
-pub async fn get_access_token(consumer_key: &ConsumerKey) -> Result<AccessToken, AppError> {
+pub async fn get_access_token(consumer_key: ConsumerKey) -> Result<AccessToken, AppError> {
+    let consumer_key = Arc::new(consumer_key);
     let request_token = acquire_request_token(
-        consumer_key,
+        consumer_key.clone(),
         None,
         Scopes::new(HashSet::from([Scope::Studies])),
     )
@@ -140,8 +142,8 @@ mod tests {
     #[ignore]
     async fn acquire_request_token_is_successful() {
         dotenvy::dotenv().ok();
-        let consumer_key = ConsumerKey::from_env().unwrap();
-        acquire_request_token(&consumer_key, None, Scopes::new(HashSet::new()))
+        let consumer_key = Arc::new(ConsumerKey::from_env().unwrap());
+        acquire_request_token(consumer_key, None, Scopes::new(HashSet::new()))
             .await
             .unwrap();
     }
@@ -153,7 +155,8 @@ mod tests {
         let mut consumer_key = ConsumerKey::from_env().unwrap();
         consumer_key.key.push('a');
 
-        let res = acquire_request_token(&consumer_key, None, Scopes::new(HashSet::new())).await;
+        let res =
+            acquire_request_token(Arc::new(consumer_key), None, Scopes::new(HashSet::new())).await;
 
         assert!(res.is_err());
     }
@@ -163,6 +166,6 @@ mod tests {
     async fn oauth_flow_no_callback_provided() {
         dotenvy::dotenv().ok();
         let consumer_key = ConsumerKey::from_env().unwrap();
-        get_access_token(&consumer_key).await.unwrap();
+        get_access_token(consumer_key).await.unwrap();
     }
 }

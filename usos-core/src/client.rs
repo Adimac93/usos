@@ -1,12 +1,14 @@
 use std::{
     cell::LazyCell,
     collections::{BTreeMap, HashMap},
+    env::VarError,
     fmt::{format, Debug},
     ops::Deref,
+    sync::Arc,
 };
 
 use anyhow::{anyhow, bail};
-use reqwest::{header::CONTENT_TYPE, RequestBuilder, Response, StatusCode};
+use reqwest::{header::CONTENT_TYPE, IntoUrl, RequestBuilder, Response, StatusCode, Url};
 use serde::{Serialize, Serializer};
 use serde_json::{json, Value};
 
@@ -18,12 +20,13 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Client {
-    base_url: &'static str,
+    base_url: Url,
     client: reqwest::Client,
+    auth: Option<Arc<ConsumerKey>>,
 }
 
 impl Client {
-    pub fn new(base_url: &'static str) -> Self {
+    pub fn new(base_url: Url) -> Self {
         let client = reqwest::Client::builder()
             .user_agent(format!(
                 "{}/{}",
@@ -34,34 +37,63 @@ impl Client {
             .build()
             .unwrap();
 
-        Self { base_url, client }
+        Self {
+            base_url,
+            client,
+            auth: None,
+        }
+    }
+
+    pub fn authorized_from_env(mut self) -> Result<Self, VarError> {
+        let consumer_key = ConsumerKey::from_env()?;
+        self.auth = Some(Arc::new(consumer_key));
+        Ok(self)
+    }
+
+    pub async fn authorized(
+        mut self,
+        app_name: &str,
+        website_url: Option<&str>,
+        email: &str,
+    ) -> crate::Result<Self> {
+        let consumer_key =
+            ConsumerKey::generate(&self.client, self.base_url(), app_name, website_url, email)
+                .await?;
+        self.auth = Some(Arc::new(consumer_key));
+        Ok(self)
     }
 
     pub fn builder(&self, uri: impl AsRef<str>) -> UsosRequestBuilder {
         UsosRequestBuilder::new(
             &self.client,
-            format!("{}/services/{}", self.base_url, uri.as_ref()),
+            self.base_url
+                .join("services/") // trailing slash is significant
+                .unwrap()
+                .join(uri.as_ref())
+                .unwrap(),
+            self.auth.clone(),
         )
     }
 
-    pub fn base_url(&self) -> &str {
-        self.base_url
+    pub fn base_url(&self) -> &Url {
+        &self.base_url
     }
 }
 
-pub const CLIENT: LazyCell<Client> = LazyCell::new(|| Client::new("https://apps.usos.pwr.edu.pl"));
+pub const CLIENT: LazyCell<Client> =
+    LazyCell::new(|| Client::new(Url::parse("https://apps.usos.pwr.edu.pl").unwrap()));
 
 #[derive(Default)]
 struct Form<'a> {
     payload: Option<BTreeMap<String, String>>,
-    auth: Option<(&'a ConsumerKey, Option<&'a AccessToken>)>,
+    auth: Option<(Arc<ConsumerKey>, Option<&'a AccessToken>)>,
     payload_error: Option<serde_urlencoded::ser::Error>,
 }
 
 impl<'a> Form<'a> {
     fn new(
         payload: Option<BTreeMap<String, String>>,
-        auth: Option<(&'a ConsumerKey, Option<&'a AccessToken>)>,
+        auth: Option<(Arc<ConsumerKey>, Option<&'a AccessToken>)>,
     ) -> Self {
         Self {
             payload,
@@ -73,16 +105,16 @@ impl<'a> Form<'a> {
 
 pub struct UsosRequestBuilder<'a> {
     request_builder: reqwest::RequestBuilder,
-    uri: String,
+    uri: Url,
     form: Form<'a>,
 }
 
 impl<'a> UsosRequestBuilder<'a> {
-    fn new(client: &reqwest::Client, uri: String) -> Self {
+    fn new(client: &reqwest::Client, uri: Url, consumer_key: Option<Arc<ConsumerKey>>) -> Self {
         Self {
-            request_builder: client.post(&uri),
+            request_builder: client.post(uri.as_ref()),
             uri,
-            form: Form::new(None, None),
+            form: Form::new(None, consumer_key.map(|key| (key, None))),
         }
     }
 
@@ -93,10 +125,16 @@ impl<'a> UsosRequestBuilder<'a> {
 
     pub fn auth(
         mut self,
-        consumer_key: &'a ConsumerKey,
+        consumer_key: Option<Arc<ConsumerKey>>,
         access_token: Option<&'a AccessToken>,
     ) -> Self {
-        self.form.auth = Some((consumer_key, access_token));
+        if let Some((consumer, access)) = &mut self.form.auth {
+            if let Some(consumer_key) = consumer_key {
+                *consumer = consumer_key;
+            }
+            *access = access_token;
+        }
+
         self
     }
 
@@ -107,9 +145,13 @@ impl<'a> UsosRequestBuilder<'a> {
         }
 
         let signed_form = match self.form.auth {
-            Some((consumer_key, token)) => {
-                authorize("POST", &self.uri, consumer_key, token, self.form.payload)
-            }
+            Some((consumer_key, token)) => authorize(
+                "POST",
+                self.uri.to_string(),
+                consumer_key.as_ref(),
+                token,
+                self.form.payload,
+            ),
             None => self.form.payload.unwrap_or_else(BTreeMap::new),
         };
 
@@ -154,19 +196,38 @@ impl<'a> UsosRequestBuilder<'a> {
 
 #[tokio::test]
 async fn test_usos_client() {
-    dotenvy::dotenv().ok();
-    let consumer_key = ConsumerKey::from_env().unwrap();
-    let client = Client::new("https://apps.usos.pw.edu.pl");
+    let client = Client::new(Url::parse("https://apps.usos.pw.edu.pl").unwrap());
     let response = client
         .builder("apiref/method")
         .payload([
             ("fields", "name|short_name"),
             ("name", "services/apiref/method"),
         ])
-        .auth(&consumer_key, None)
         .request_json()
         .await
         .unwrap();
 
     println!("{:?}", response);
+}
+
+#[test]
+fn relative_url_parts_joining_is_successful() {
+    let base = "https://apps.usos.pwr.edu.pl";
+    let client = Client::new(Url::parse(base).unwrap());
+    let builder = client.builder("apiref/method");
+    assert_eq!(
+        builder.uri,
+        Url::parse("https://apps.usos.pwr.edu.pl/services/apiref/method").unwrap()
+    )
+}
+
+#[test]
+fn relative_url_parts_joining_is_failing() {
+    let base = "https://apps.usos.pwr.edu.pl";
+    let client = Client::new(Url::parse(base).unwrap());
+    let builder = client.builder("/apiref/method");
+    assert_eq!(
+        builder.uri,
+        Url::parse("https://apps.usos.pwr.edu.pl/apiref/method").unwrap()
+    )
 }

@@ -1,7 +1,10 @@
 use std::{env::VarError, path::Path};
 
 use anyhow::Context;
-use reqwest::header::{COOKIE, HOST, ORIGIN, REFERER};
+use reqwest::{
+    header::{COOKIE, HOST, ORIGIN, REFERER},
+    Url,
+};
 use secrecy::{ExposeSecret, Secret, SecretString};
 use serde::{Deserialize, Serialize};
 use time::macros::format_description;
@@ -27,6 +30,7 @@ impl UsosUri {
     }
 }
 
+#[derive(Debug)]
 pub struct ConsumerKey {
     /// Developer email
     pub owner: Option<String>,
@@ -50,22 +54,25 @@ impl ConsumerKey {
     }
 
     pub async fn generate(
+        client: &reqwest::Client,
+        base_url: &Url,
         app_name: &str,
         website_url: Option<&str>,
         email: &str,
     ) -> crate::Result<Self> {
         let form = RegistrationForm::new(app_name, website_url, email);
-        let response = reqwest::Client::new()
-            .get(UsosUri::with_path("developers"))
+        let response = client
+            .get(base_url.join("developers").unwrap())
             .send()
             .await?;
+
         let csrf_token_cookie = response
             .cookies()
             .next()
             .context("Csrf token cookie expected but not found")?;
 
-        let response = reqwest::Client::new()
-            .post(UsosUri::with_path("developers/submit"))
+        let response = client
+            .post(base_url.join("developers/submit").unwrap())
             .header(COOKIE, &format!("csrftoken={}", csrf_token_cookie.value()))
             .header(HOST, UsosUri::DOMAIN)
             .header(ORIGIN, UsosUri::origin())

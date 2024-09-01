@@ -23,7 +23,7 @@ fn rand_alphanumeric_string(target_len: usize) -> String {
 
 pub fn authorize<'a>(
     method: &str,
-    uri: &str,
+    uri: impl AsRef<str>,
     consumer: &ConsumerKey,
     token: Option<&AccessToken>,
     params: impl Into<Params>,
@@ -44,7 +44,7 @@ pub fn authorize<'a>(
 
     let signature = gen_signature(
         method,
-        uri,
+        uri.as_ref(),
         &to_query(&params),
         consumer.secret.expose_secret(),
         token.map(|t| t.secret.expose_secret().as_ref()),
