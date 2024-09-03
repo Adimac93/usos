@@ -8,9 +8,8 @@ use anyhow::Context;
 use secrecy::SecretString;
 
 use crate::{
-    api::util::parse_ampersand_params,
-    api::{oauth1::authorize, types::scopes::Scope},
-    client::CLIENT,
+    api::{oauth1::authorize, types::scopes::Scope, util::parse_ampersand_params},
+    client::{Client, CLIENT},
     errors::AppError,
     keys::ConsumerKey,
 };
@@ -28,7 +27,7 @@ pub struct AccessToken {
 }
 
 pub async fn acquire_request_token(
-    consumer_key: ConsumerKey,
+    client: &Client,
     callback: Option<String>,
     scopes: Scopes,
 ) -> crate::Result<OAuthRequestToken> {
@@ -37,7 +36,6 @@ pub async fn acquire_request_token(
     let body = CLIENT
         .builder("oauth/request_token")
         .payload([("oauth_callback", callback), ("scopes", scopes.to_string())])
-        .auth(Some(consumer_key), None)
         .request()
         .await?
         .text()
@@ -63,20 +61,17 @@ pub async fn acquire_request_token(
 }
 
 pub async fn acquire_access_token(
-    consumer_key: ConsumerKey,
+    client: &Client,
     request_token: OAuthRequestToken,
     verifier: impl Into<String>,
 ) -> crate::Result<AccessToken> {
-    let body = CLIENT
+    let body = client
         .builder("oauth/access_token")
         .payload([("oauth_verifier", verifier.into())])
-        .auth(
-            Some(consumer_key),
-            Some(&AccessToken {
-                token: request_token.token,
-                secret: request_token.secret,
-            }),
-        )
+        .auth(&AccessToken {
+            token: request_token.token,
+            secret: request_token.secret,
+        })
         .request()
         .await?
         .text()
@@ -120,22 +115,19 @@ async fn get_pin(oauth_token: String) -> String {
 }
 
 #[cfg(test)]
-pub async fn get_access_token(consumer_key: ConsumerKey) -> Result<AccessToken, AppError> {
-    let request_token = acquire_request_token(
-        consumer_key.clone(),
-        None,
-        Scopes::new(HashSet::from([Scope::Studies])),
-    )
-    .await?;
+pub async fn get_access_token(client: &Client) -> Result<AccessToken, AppError> {
+    let request_token =
+        acquire_request_token(client, None, Scopes::new(HashSet::from([Scope::Studies]))).await?;
 
     let verifier = get_pin(request_token.token.clone()).await;
 
-    Ok(acquire_access_token(consumer_key, request_token, verifier).await?)
+    Ok(acquire_access_token(client, request_token, verifier).await?)
 }
 
 #[cfg(test)]
 mod tests {
 
+    use reqwest::Url;
     use secrecy::Secret;
 
     use super::*;
@@ -144,8 +136,10 @@ mod tests {
     #[ignore]
     async fn acquire_request_token_is_successful() {
         dotenvy::dotenv().ok();
-        let consumer_key = ConsumerKey::from_env().unwrap();
-        acquire_request_token(consumer_key, None, Scopes::new(HashSet::new()))
+        let client = Client::new(Url::parse("https://apps.usos.pwr.edu.pl").unwrap())
+            .authorized_from_env()
+            .unwrap();
+        acquire_request_token(&client, None, Scopes::new(HashSet::new()))
             .await
             .unwrap();
     }
@@ -156,8 +150,9 @@ mod tests {
         dotenvy::dotenv().ok();
         let mut consumer_key =
             ConsumerKey::new("key".into(), Secret::from(String::from("secret")), None);
-
-        let res = acquire_request_token(consumer_key, None, Scopes::new(HashSet::new())).await;
+        let client = Client::new(Url::parse("https://apps.usos.pwr.edu.pl").unwrap())
+            .authorized_from_key(consumer_key);
+        let res = acquire_request_token(&client, None, Scopes::new(HashSet::new())).await;
 
         assert!(res.is_err());
     }
@@ -166,7 +161,9 @@ mod tests {
     #[ignore = "requires user interaction"]
     async fn oauth_flow_no_callback_provided() {
         dotenvy::dotenv().ok();
-        let consumer_key = ConsumerKey::from_env().unwrap();
-        get_access_token(consumer_key).await.unwrap();
+        let client = Client::new(Url::parse("https://apps.usos.pwr.edu.pl").unwrap())
+            .authorized_from_env()
+            .unwrap();
+        get_access_token(&client).await.unwrap();
     }
 }

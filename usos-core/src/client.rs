@@ -50,6 +50,11 @@ impl Client {
         Ok(self)
     }
 
+    pub fn authorized_from_key(mut self, consumer_key: ConsumerKey) -> Self {
+        self.auth = Some(consumer_key);
+        self
+    }
+
     pub async fn authorized(
         mut self,
         app_name: &str,
@@ -123,16 +128,10 @@ impl<'a> UsosRequestBuilder<'a> {
         self
     }
 
-    pub fn auth(
-        mut self,
-        consumer_key: Option<ConsumerKey>,
-        access_token: Option<&'a AccessToken>,
-    ) -> Self {
+    /// ignores access token if consumer key was not set inside the client
+    pub fn auth(mut self, access_token: &'a AccessToken) -> Self {
         if let Some((consumer, access)) = &mut self.form.auth {
-            if let Some(consumer_key) = consumer_key {
-                *consumer = consumer_key;
-            }
-            *access = access_token;
+            *access = Some(access_token);
         }
 
         self
