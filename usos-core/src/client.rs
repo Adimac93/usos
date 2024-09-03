@@ -55,6 +55,7 @@ impl Client {
         self
     }
 
+    #[cfg(feature = "keygen")]
     pub async fn authorized(
         mut self,
         app_name: &str,

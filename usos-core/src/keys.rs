@@ -1,3 +1,4 @@
+#[cfg(feature = "keygen")]
 pub mod generation;
 
 use std::{env::VarError, ops::Deref, path::Path, sync::Arc};

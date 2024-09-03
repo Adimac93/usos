@@ -24,3 +24,7 @@ tokio = { version = "1.39.2", features = ["full"] }
 
 [dev-dependencies]
 rstest = "0.22.0"
+
+[features]
+default = []
+keygen = []
