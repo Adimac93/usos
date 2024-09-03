@@ -22,7 +22,7 @@ use crate::{
 pub struct Client {
     base_url: Url,
     client: reqwest::Client,
-    auth: Option<Arc<ConsumerKey>>,
+    auth: Option<ConsumerKey>,
 }
 
 impl Client {
@@ -46,7 +46,7 @@ impl Client {
 
     pub fn authorized_from_env(mut self) -> Result<Self, VarError> {
         let consumer_key = ConsumerKey::from_env()?;
-        self.auth = Some(Arc::new(consumer_key));
+        self.auth = Some(consumer_key);
         Ok(self)
     }
 
@@ -59,7 +59,7 @@ impl Client {
         let consumer_key =
             ConsumerKey::generate(&self.client, self.base_url(), app_name, website_url, email)
                 .await?;
-        self.auth = Some(Arc::new(consumer_key));
+        self.auth = Some(consumer_key);
         Ok(self)
     }
 
@@ -86,14 +86,14 @@ pub const CLIENT: LazyCell<Client> =
 #[derive(Default)]
 struct Form<'a> {
     payload: Option<BTreeMap<String, String>>,
-    auth: Option<(Arc<ConsumerKey>, Option<&'a AccessToken>)>,
+    auth: Option<(ConsumerKey, Option<&'a AccessToken>)>,
     payload_error: Option<serde_urlencoded::ser::Error>,
 }
 
 impl<'a> Form<'a> {
     fn new(
         payload: Option<BTreeMap<String, String>>,
-        auth: Option<(Arc<ConsumerKey>, Option<&'a AccessToken>)>,
+        auth: Option<(ConsumerKey, Option<&'a AccessToken>)>,
     ) -> Self {
         Self {
             payload,
@@ -110,7 +110,7 @@ pub struct UsosRequestBuilder<'a> {
 }
 
 impl<'a> UsosRequestBuilder<'a> {
-    fn new(client: &reqwest::Client, uri: Url, consumer_key: Option<Arc<ConsumerKey>>) -> Self {
+    fn new(client: &reqwest::Client, uri: Url, consumer_key: Option<ConsumerKey>) -> Self {
         Self {
             request_builder: client.post(uri.as_ref()),
             uri,
@@ -125,7 +125,7 @@ impl<'a> UsosRequestBuilder<'a> {
 
     pub fn auth(
         mut self,
-        consumer_key: Option<Arc<ConsumerKey>>,
+        consumer_key: Option<ConsumerKey>,
         access_token: Option<&'a AccessToken>,
     ) -> Self {
         if let Some((consumer, access)) = &mut self.form.auth {
@@ -148,7 +148,7 @@ impl<'a> UsosRequestBuilder<'a> {
             Some((consumer_key, token)) => authorize(
                 "POST",
                 self.uri.to_string(),
-                consumer_key.as_ref(),
+                &consumer_key,
                 token,
                 self.form.payload,
             ),

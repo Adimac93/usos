@@ -28,7 +28,7 @@ pub struct AccessToken {
 }
 
 pub async fn acquire_request_token(
-    consumer_key: Arc<ConsumerKey>,
+    consumer_key: ConsumerKey,
     callback: Option<String>,
     scopes: Scopes,
 ) -> crate::Result<OAuthRequestToken> {
@@ -63,7 +63,7 @@ pub async fn acquire_request_token(
 }
 
 pub async fn acquire_access_token(
-    consumer_key: Arc<ConsumerKey>,
+    consumer_key: ConsumerKey,
     request_token: OAuthRequestToken,
     verifier: impl Into<String>,
 ) -> crate::Result<AccessToken> {
@@ -121,7 +121,6 @@ async fn get_pin(oauth_token: String) -> String {
 
 #[cfg(test)]
 pub async fn get_access_token(consumer_key: ConsumerKey) -> Result<AccessToken, AppError> {
-    let consumer_key = Arc::new(consumer_key);
     let request_token = acquire_request_token(
         consumer_key.clone(),
         None,
@@ -136,13 +135,16 @@ pub async fn get_access_token(consumer_key: ConsumerKey) -> Result<AccessToken, 
 
 #[cfg(test)]
 mod tests {
+
+    use secrecy::Secret;
+
     use super::*;
 
     #[tokio::test]
     #[ignore]
     async fn acquire_request_token_is_successful() {
         dotenvy::dotenv().ok();
-        let consumer_key = Arc::new(ConsumerKey::from_env().unwrap());
+        let consumer_key = ConsumerKey::from_env().unwrap();
         acquire_request_token(consumer_key, None, Scopes::new(HashSet::new()))
             .await
             .unwrap();
@@ -152,11 +154,10 @@ mod tests {
     #[ignore]
     async fn acquire_request_token_invalid_consumer_key() {
         dotenvy::dotenv().ok();
-        let mut consumer_key = ConsumerKey::from_env().unwrap();
-        consumer_key.key.push('a');
+        let mut consumer_key =
+            ConsumerKey::new("key".into(), Secret::from(String::from("secret")), None);
 
-        let res =
-            acquire_request_token(Arc::new(consumer_key), None, Scopes::new(HashSet::new())).await;
+        let res = acquire_request_token(consumer_key, None, Scopes::new(HashSet::new())).await;
 
         assert!(res.is_err());
     }

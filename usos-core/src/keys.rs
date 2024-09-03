@@ -1,4 +1,4 @@
-use std::{env::VarError, path::Path};
+use std::{env::VarError, ops::Deref, path::Path, sync::Arc};
 
 use anyhow::Context;
 use reqwest::{
@@ -30,8 +30,21 @@ impl UsosUri {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConsumerKey {
+    inner: Arc<ConsumerKeyRef>,
+}
+
+impl Deref for ConsumerKey {
+    type Target = ConsumerKeyRef;
+
+    fn deref(&self) -> &Self::Target {
+        self.inner.as_ref()
+    }
+}
+
+#[derive(Debug)]
+pub struct ConsumerKeyRef {
     /// Developer email
     pub owner: Option<String>,
     pub key: String,
@@ -40,16 +53,20 @@ pub struct ConsumerKey {
 
 impl ConsumerKey {
     pub fn new(key: String, secret: SecretString, owner: Option<String>) -> Self {
-        Self { key, secret, owner }
+        Self {
+            inner: Arc::new(ConsumerKeyRef { owner, key, secret }),
+        }
     }
 
     pub fn from_env() -> Result<Self, VarError> {
         let key = std::env::var(CONSUMER_KEY_NAME)?;
         let secret = SecretString::new(std::env::var(CONSUMER_SECRET_NAME)?);
         Ok(Self {
-            key,
-            secret,
-            owner: std::env::var(CONSUMER_KEY_OWNER).ok(),
+            inner: Arc::new(ConsumerKeyRef {
+                key,
+                secret,
+                owner: std::env::var(CONSUMER_KEY_OWNER).ok(),
+            }),
         })
     }
 
@@ -92,9 +109,11 @@ impl ConsumerKey {
         }
 
         return Ok(Self {
-            key: reg.consumer_key,
-            secret: reg.consumer_secret,
-            owner: Some(email.into()),
+            inner: Arc::new(ConsumerKeyRef {
+                key: reg.consumer_key,
+                secret: reg.consumer_secret,
+                owner: Some(email.into()),
+            }),
         });
     }
 
