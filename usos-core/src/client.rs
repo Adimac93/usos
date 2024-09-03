@@ -71,7 +71,7 @@ impl Client {
                 .unwrap()
                 .join(uri.as_ref())
                 .unwrap(),
-            self.auth.clone(),
+            self.auth.as_deref(),
         )
     }
 
@@ -86,18 +86,21 @@ pub const CLIENT: LazyCell<Client> =
 #[derive(Default)]
 struct Form<'a> {
     payload: Option<BTreeMap<String, String>>,
-    auth: Option<(Arc<ConsumerKey>, Option<&'a AccessToken>)>,
+    consumer_key: Option<&'a ConsumerKey>,
+    access_token: Option<&'a AccessToken>,
     payload_error: Option<serde_urlencoded::ser::Error>,
 }
 
 impl<'a> Form<'a> {
     fn new(
         payload: Option<BTreeMap<String, String>>,
-        auth: Option<(Arc<ConsumerKey>, Option<&'a AccessToken>)>,
+        consumer_key: Option<&'a ConsumerKey>,
+        access_token: Option<&'a AccessToken>,
     ) -> Self {
         Self {
             payload,
-            auth,
+            consumer_key,
+            access_token,
             payload_error: None,
         }
     }
@@ -110,11 +113,11 @@ pub struct UsosRequestBuilder<'a> {
 }
 
 impl<'a> UsosRequestBuilder<'a> {
-    fn new(client: &reqwest::Client, uri: Url, consumer_key: Option<Arc<ConsumerKey>>) -> Self {
+    fn new(client: &reqwest::Client, uri: Url, consumer_key: Option<&'a ConsumerKey>) -> Self {
         Self {
             request_builder: client.post(uri.as_ref()),
             uri,
-            form: Form::new(None, consumer_key.map(|key| (key, None))),
+            form: Form::new(None, consumer_key, None),
         }
     }
 
@@ -125,31 +128,28 @@ impl<'a> UsosRequestBuilder<'a> {
 
     pub fn auth(
         mut self,
-        consumer_key: Option<Arc<ConsumerKey>>,
+        consumer_key: Option<&'a ConsumerKey>,
         access_token: Option<&'a AccessToken>,
     ) -> Self {
-        if let Some((consumer, access)) = &mut self.form.auth {
-            if let Some(consumer_key) = consumer_key {
-                *consumer = consumer_key;
-            }
-            *access = access_token;
+        if let Some(consumer_key) = consumer_key {
+            self.form.consumer_key = Some(consumer_key);
         }
+        self.form.access_token = access_token;
 
         self
     }
 
     pub async fn request(mut self) -> Result<Response, AppError> {
         if let Some(e) = self.form.payload_error {
-            // TODO: handle invalid form error
             return Err(AppError::Unexpected(anyhow::anyhow!(e)));
         }
 
-        let signed_form = match self.form.auth {
-            Some((consumer_key, token)) => authorize(
+        let signed_form = match self.form.consumer_key {
+            Some(consumer_key) => authorize(
                 "POST",
                 self.uri.to_string(),
-                consumer_key.as_ref(),
-                token,
+                consumer_key,
+                self.form.access_token,
                 self.form.payload,
             ),
             None => self.form.payload.unwrap_or_else(BTreeMap::new),

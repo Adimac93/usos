@@ -37,7 +37,7 @@ pub async fn acquire_request_token(
     let body = CLIENT
         .builder("oauth/request_token")
         .payload([("oauth_callback", callback), ("scopes", scopes.to_string())])
-        .auth(Some(consumer_key), None)
+        .auth(Some(&*consumer_key), None)
         .request()
         .await?
         .text()
@@ -71,7 +71,7 @@ pub async fn acquire_access_token(
         .builder("oauth/access_token")
         .payload([("oauth_verifier", verifier.into())])
         .auth(
-            Some(consumer_key),
+            Some(&*consumer_key),
             Some(&AccessToken {
                 token: request_token.token,
                 secret: request_token.secret,
