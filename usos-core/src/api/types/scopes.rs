@@ -1,6 +1,9 @@
 use std::{collections::HashSet, fmt::Display, str::FromStr};
 
 use serde::Deserialize;
+
+/// A wrapper struct that contains a set of scopes.
+#[derive(Debug, Clone)]
 pub struct Scopes(HashSet<Scope>);
 
 impl Scopes {
@@ -23,7 +26,7 @@ impl Display for Scopes {
     }
 }
 
-#[derive(Deserialize, Debug, Hash, Eq, PartialEq)]
+#[derive(Deserialize, Debug, Hash, Eq, PartialEq, Clone, Copy)]
 /// /services/apiref/scopes
 pub enum Scope {
     /// Allows access to get administration documents etc.

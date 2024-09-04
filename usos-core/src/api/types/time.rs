@@ -1,3 +1,8 @@
+//! The USOS API time types.
+//!
+//! Note: USOS API provides time based on the Polish time zone, which is UTC+1 normally and UTC+2 in a daylight savings time
+//! starting from the last Sunday in March and ending in the last Sunday in October. The types in this module **do not** include any time zone offsets.
+
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
@@ -11,7 +16,8 @@ pub const DATE_TIME_FORMAT: &[BorrowedFormatItem<'_>] =
 pub const PRECISE_DATE_TIME_FORMAT: &[BorrowedFormatItem<'_>] =
     format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6]");
 
-#[derive(Debug, Serialize, Deserialize)]
+/// Date as provided by the USOS API (yyyy-mm-dd).
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct UsosDate(#[serde(with = "crate::date_string")] pub time::Date);
 
 impl From<UsosDate> for time::Date {
@@ -32,7 +38,8 @@ impl Display for UsosDate {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+/// Time as provided by the USOS API (hh:mm:ss).
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct UsosTime(#[serde(with = "crate::time_string")] pub time::Time);
 
 impl From<UsosTime> for time::Time {
@@ -53,7 +60,8 @@ impl Display for UsosTime {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+/// Datetime as provided by the USOS API (yyyy-mm-dd hh:mm:ss).
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct UsosDateTime(#[serde(with = "crate::datetime_string")] pub time::PrimitiveDateTime);
 
 impl From<UsosDateTime> for time::PrimitiveDateTime {
@@ -74,7 +82,8 @@ impl Display for UsosDateTime {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+/// Datetime with the microsecond precision as provided by the USOS API (yyyy-mm-dd hh:mm:ss.mmmmmm)
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct UsosPreciseDateTime(
     #[serde(with = "crate::precise_datetime_string")] pub time::PrimitiveDateTime,
 );

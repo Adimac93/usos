@@ -4,6 +4,9 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+/// A type designed to contain human-readable responses in multiple languages.
+///
+/// See the "Language" section of [the USOS API reference](https://apps.usos.pw.edu.pl/developers/api/definitions/datatypes/).
 #[derive(Debug, Deserialize)]
 pub struct LanguageDictionary(HashMap<Language, String>);
 
@@ -27,6 +30,7 @@ impl LanguageDictionary {
     }
 }
 
+/// All languages supported in user-friendly responses.
 #[derive(Debug, Deserialize, Hash, Eq, PartialEq)]
 pub enum Language {
     #[serde(rename = "pl")]
