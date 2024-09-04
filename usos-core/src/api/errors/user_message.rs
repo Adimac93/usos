@@ -10,7 +10,7 @@ use std::{
 pub struct UserMessages {
     /// [`LanguageDictionary`] object, with the generic (context-free) message to be displayed for the user.
     generic_message: Option<LanguageDictionary>,
-    /// possibly empty - dictionary of parameters which have failed the validation, along with [`LanguageDictionary`] messages for each of them. Usually, the keys of this dictionary will match the named of the method parameters, but it is not a strict rule (e.g. some methods expect the forms to be submitted in a single parameter, as a JSON-encoded string).
+    /// Possibly empty - dictionary of parameters which have failed the validation, along with [`LanguageDictionary`] messages for each of them. Usually, the keys of this dictionary will match the named of the method parameters, but it is not a strict rule (e.g. some methods expect the forms to be submitted in a single parameter, as a JSON-encoded string).
     fields: Option<HashMap<String, LanguageDictionary>>,
 }
 

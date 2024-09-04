@@ -13,12 +13,17 @@ pub mod kind;
 pub mod reason;
 pub mod user_message;
 
+/// A representation of standardized error objects sent by USOS API.
+/// See [the USOS API reference](https://apps.usos.pw.edu.pl/developers/api/definitions/errors/) for more details.
 #[derive(Debug)]
 pub struct UsosError {
     /// Error description for the developer
     message: String,
+    /// Error code
     kind: Option<UsosErrorKind>,
+    /// Error description designed to be user-friendly
     user_messages: Option<UserMessages>,
+    /// Required scopes that are missing
     missing_scopes: Option<Vec<Scope>>,
 }
 
@@ -57,39 +62,47 @@ impl Display for UsosError {
     }
 }
 
+/// Possible error codes that USOS API can send.
 #[derive(Debug)]
 pub enum UsosErrorKind {
-    MethodForbidden {
-        reason: Reason,
-    },
-    ParamMissing {
-        param_name: String,
-    },
-    ParamInvalid {
-        param_name: String,
-    },
-    ParamForbidden {
-        param_name: String,
-        reason: Reason,
-    },
+    /// Access to the method is denied.
+    MethodForbidden { reason: Reason },
+    /// Required parameter is not provided.
+    ParamMissing { param_name: String },
+    /// The value of the parameter is invalid.
+    ParamInvalid { param_name: String },
+    /// You are not allowed to use the specified parameter.
+    ParamForbidden { param_name: String, reason: Reason },
+    /// Field specified in the `fields` parameter does not exist.
     FieldNotFound {
         field_name: String,
         method_name: String,
     },
+    /// The specified field is invalid.
+    ///
+    /// This can happen for a variety of reasons:
+    /// - you have provided subfields for field that does not refer to subobject(s),
+    /// for example you gave the input `foo[bar]` and the returned object under the property `foo` does not contain the property `bar`
+    /// - you have omitted subfields that were required;
+    /// - you have used secondary field, but only primary were allowed.
     FieldInvalid {
         field_name: String,
         method_name: String,
     },
+    /// You do not have access to some of the requested fields.
     FieldForbidden {
         field_name: String,
         method_name: String,
         reason: Reason,
     },
+    /// Some of the referenced objects do not exist.
     ObjecetNotFound {
         param_name: String,
         method_name: String,
     },
+    /// The referenced object is in a state that prevents method execution, see the appropriate USOS API method documentation for more detalis.
     ObjectInvalid,
+    /// Access to the referenced object was denied.
     ObjectForbidden,
 }
 

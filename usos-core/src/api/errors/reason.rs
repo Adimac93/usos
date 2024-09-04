@@ -4,22 +4,23 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
+/// Possible reasons for lack of permission to access resources from USOS API
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Reason {
-    /// consumer signature is missing;
+    /// Consumer signature is missing;
     ConsumerMissing,
-    /// access token is required;
+    /// Access token is required;
     UserMissing,
-    /// secure connection (SSL) is required;
+    /// Secure connection (SSL) is required;
     SecureRequired,
-    /// only administrative consumers are allowed;
+    /// Only administrative consumers are allowed;
     TrustedRequired,
-    /// access token does not contain some of the required scopes; in this case an additional key **missing_scopes** will be present in the dictionary with the list of missing scopes;
+    /// Access token does not contain some of the required scopes; in this case an additional key **missing_scopes** will be present in the dictionary with the list of missing scopes;
     ScopeMissing,
     /// **as_user_id** parameter was used with a method which you do not have administrative access to;
     ImpersonateRequired,
-    /// methods may define their own custom reason codes.
+    /// Methods may define their own custom reason codes.
     Custom(String),
 }
 
