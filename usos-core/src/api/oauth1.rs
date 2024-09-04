@@ -21,6 +21,24 @@ fn rand_alphanumeric_string(target_len: usize) -> String {
         .collect()
 }
 
+/// Generates OAuth 1.0a authorization parameters for a request.
+///
+/// This function handles the core functionality - it receives request parameters
+/// and appends another parameters required for OAuth1.0a authorization.
+///
+/// # Arguments
+///
+/// * `method` - The HTTP method of the request (e.g., "GET", "POST").
+/// * `uri` - The URI of the request as a string reference.
+/// * `consumer` - The `ConsumerKey` containing the key and secret for the application.
+/// * `token` - An optional `AccessToken` containing the token and secret for user authentication.
+/// * `params` - Additional parameters to include in the OAuth signature, convertible to `Params`.
+///
+/// # Returns
+///
+/// Returns a `BTreeMap<String, String>` containing the OAuth parameters, including provided parameters,
+/// generated authorization parameters and the signature. These parameters should be included
+/// in the form body or query string of the HTTP request.
 pub fn authorize<'a>(
     method: &str,
     uri: impl AsRef<str>,
