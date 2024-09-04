@@ -1,10 +1,16 @@
 use super::{auth::AccessToken, oauth1::authorize};
 use crate::keys::ConsumerKey;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
 };
+
+/// A wrapper that contains request form or query parameters.
+///
+/// Its main purpose is to serve as an intermediate type that allows for
+/// compile-time-checked conversions from various collections using the `From` trait.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Params(pub BTreeMap<String, String>);
 
 impl Deref for Params {
@@ -88,7 +94,8 @@ where
     }
 }
 
-pub struct ParamString(String);
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ParamString(String);
 
 impl Deref for ParamString {
     type Target = String;
