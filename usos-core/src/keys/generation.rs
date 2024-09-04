@@ -18,6 +18,35 @@ use super::{
 impl ConsumerKey {
     // TODO: either create an error type dedicated for keygen scripts, or allow the function to panic on many occasions related to user input
     // TODO: consider creating a CLI tool for generating keys that uses this code underneath.
+
+    /// Registers a new consumer key with the USOS API.
+    ///
+    /// IMPORTANT: This function performs calls to USOS API that modify your resources.
+    /// Specifically, it sends a POST request to `{base_url}/developers/submit`. Use with caution.
+    ///
+    /// This function sends a registration request to the USOS API using the provided client, base URL,
+    /// application name, and email. It also supports an optional website URL.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - The `reqwest::Client` used to make the HTTP requests.
+    /// * `base_url` - The base URL (origin) of the USOS API **with trailing slash** (example: <https://apps.usos.pwr.edu.pl/>).
+    /// * `app_name` - The name of the application to register.
+    /// * `website_url` - An optional website URL associated with the application.
+    /// * `email` - The developer's email address used for registration.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(Self)` with a newly registered `ConsumerKey` upon successful registration.
+    /// If the registration fails due to a client or server error, an `AppError::Unexpected` error is returned.
+    ///
+    /// # Errors
+    ///
+    /// This function depends on USOS API and therefore can fail due to the api error, in which case an unexpected [`AppError`] is returned.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `base_url` does not end with a trailing slash or isn't a valid HTTP origin.
     pub async fn generate(
         client: &reqwest::Client,
         base_url: &Url,
@@ -70,6 +99,25 @@ impl ConsumerKey {
         });
     }
 
+    /// Saves the consumer key information to a `.env` file.
+    ///
+    /// IMPORTANT: This call exposes the consumer secret and writes it to the file.
+    ///
+    /// This function writes the consumer key, consumer secret, and optionally the owner's email
+    /// to a file in the current directory.
+    ///
+    /// The file contents will be formatted as environment variables:
+    ///
+    /// ```env
+    /// USOS_CONSUMER_KEY=your_consumer_key
+    /// USOS_CONSUMER_SECRET=your_consumer_secret
+    /// USOS_CONSUMER_EMAIL=your_email@example.com
+    ///
+    /// # if no consumer email is provided:
+    /// # USOS_CONSUMER_EMAIL=
+    /// ```
+    ///
+    /// Example target file name: `2024-09-03_11-50_consumer_key.env`
     pub async fn save_to_file(&self) -> Result<(), tokio::io::Error> {
         tokio::fs::write(
             Path::new(&format!(
@@ -88,6 +136,19 @@ impl ConsumerKey {
         .await
     }
 
+    /// Revokes the consumer key with the USOS API.
+    ///
+    /// IMPORTANT: This function performs calls to USOS API that modify your resources. Use with caution.
+    /// Also, after calling this endpoint you will receive an email from USOS to complete revocation process.
+    ///
+    /// This function sends a request to the `/services/oauth/revoke_consumer_key` endpoint of the USOS API,
+    /// effectively revoking the consumer key and secret that were previously issued.
+    /// This is useful when you want to invalidate a key, such as when it's no longer needed
+    /// or has been compromised.
+    ///
+    /// # Arguments
+    ///
+    /// * `base_url` - The base URL (origin) of the USOS API, **with a trailing slash**.
     pub async fn revoke(self, base_url: &Url) -> crate::Result<()> {
         let url = base_url.join("services/oauth/revoke_consumer_key").unwrap();
 
