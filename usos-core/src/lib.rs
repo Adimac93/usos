@@ -1,3 +1,7 @@
+//! A crate that provides the lower-level abstractions on USOS API.
+//!
+//! If you intend to use more sophisticated features, consider using the higher-level `usos` crate.
+
 #![cfg_attr(debug_assertions, allow(unused))]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 

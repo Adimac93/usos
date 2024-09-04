@@ -1,3 +1,5 @@
+//! Scopes present in the USOS API.
+
 use std::{collections::HashSet, fmt::Display, str::FromStr};
 
 use serde::Deserialize;

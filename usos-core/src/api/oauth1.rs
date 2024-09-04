@@ -1,3 +1,5 @@
+//! Utilities for authorizing requests.
+
 use base64::Engine;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC};
 use rand::distributions::{Alphanumeric, Distribution};

@@ -1,3 +1,5 @@
+//! Consumer key and its generation.
+
 #[cfg(feature = "keygen")]
 pub mod generation;
 

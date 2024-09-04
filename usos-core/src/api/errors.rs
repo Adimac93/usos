@@ -1,3 +1,5 @@
+//! USOS API error handling utilities.
+
 use std::{
     error::Error,
     fmt::{self, write, Display, Formatter},

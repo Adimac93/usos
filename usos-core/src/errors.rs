@@ -1,3 +1,5 @@
+//! Crate errors, including both USOS API errors and internal unexpected errors.
+
 use anyhow::anyhow;
 use reqwest::StatusCode;
 use thiserror::Error;

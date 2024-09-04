@@ -1,3 +1,5 @@
+//! The language dictionary
+
 use serde::Deserialize;
 use std::{
     collections::HashMap,

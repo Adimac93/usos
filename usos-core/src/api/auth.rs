@@ -1,3 +1,5 @@
+//! USOS API authorization utilities for handling the OAuth1.0a flow.
+
 use std::{
     collections::{HashMap, HashSet},
     io::Write,

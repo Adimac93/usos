@@ -1,3 +1,5 @@
+//! The client used to call USOS API endpoints.
+
 use std::{
     cell::LazyCell,
     collections::{BTreeMap, HashMap},
