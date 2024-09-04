@@ -28,3 +28,7 @@ rstest = "0.22.0"
 [features]
 default = []
 keygen = []
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

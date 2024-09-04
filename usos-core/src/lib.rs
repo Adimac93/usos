@@ -1,4 +1,5 @@
 #![cfg_attr(debug_assertions, allow(unused))]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 pub mod api;
 pub mod client;
