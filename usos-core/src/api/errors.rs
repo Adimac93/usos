@@ -6,36 +6,26 @@ use std::{
 };
 
 use super::types::scopes::Scope;
-use kind::ErrorKind;
 use reason::Reason;
 use serde::Deserialize;
 use serde_json::json;
 use user_message::UserMessages;
-pub mod kind;
 pub mod reason;
 pub mod user_message;
 
 /// A representation of standardized error objects sent by USOS API.
 /// See [the USOS API reference](https://apps.usos.pw.edu.pl/developers/api/definitions/errors/) for more details.
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct UsosError {
     /// Error description for the developer
     message: String,
     /// Error code
+    #[serde(flatten)]
     kind: Option<UsosErrorKind>,
     /// Error description designed to be user-friendly
     user_messages: Option<UserMessages>,
     /// Required scopes that are missing
     missing_scopes: Option<Vec<Scope>>,
-}
-
-impl<'de> Deserialize<'de> for UsosError {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        Ok(Self::from(RawError::deserialize(deserializer)?))
-    }
 }
 
 impl Error for UsosError {}
@@ -65,7 +55,9 @@ impl Display for UsosError {
 }
 
 /// Possible error codes that USOS API can send.
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(tag = "error")]
+#[serde(rename_all = "snake_case")]
 pub enum UsosErrorKind {
     /// Access to the method is denied.
     MethodForbidden { reason: Reason },
@@ -106,51 +98,6 @@ pub enum UsosErrorKind {
     ObjectInvalid,
     /// Access to the referenced object was denied.
     ObjectForbidden,
-}
-
-impl From<RawError> for UsosError {
-    fn from(error: RawError) -> Self {
-        let kind = error.kind.map(|kind| match kind {
-            ErrorKind::MethodForbidden => UsosErrorKind::MethodForbidden {
-                reason: error.reason.unwrap(),
-            },
-            ErrorKind::ParamMissing => UsosErrorKind::ParamMissing {
-                param_name: error.param_name.unwrap(),
-            },
-            ErrorKind::ParamInvalid => UsosErrorKind::ParamInvalid {
-                param_name: error.param_name.unwrap(),
-            },
-            ErrorKind::ParamForbidden => UsosErrorKind::ParamForbidden {
-                param_name: error.param_name.unwrap(),
-                reason: error.reason.unwrap(),
-            },
-            ErrorKind::FieldNotFound => UsosErrorKind::FieldNotFound {
-                field_name: error.field_name.unwrap(),
-                method_name: error.method_name.unwrap(),
-            },
-            ErrorKind::FieldInvalid => UsosErrorKind::FieldInvalid {
-                field_name: error.field_name.unwrap(),
-                method_name: error.method_name.unwrap(),
-            },
-            ErrorKind::FieldForbidden => UsosErrorKind::FieldForbidden {
-                field_name: error.field_name.unwrap(),
-                method_name: error.method_name.unwrap(),
-                reason: error.reason.unwrap(),
-            },
-            ErrorKind::ObjectNotFound => UsosErrorKind::ObjecetNotFound {
-                param_name: error.param_name.unwrap(),
-                method_name: error.method_name.unwrap(),
-            },
-            ErrorKind::ObjectInvalid => UsosErrorKind::ObjectInvalid,
-            ErrorKind::ObjectForbidden => UsosErrorKind::ObjectForbidden,
-        });
-        UsosError {
-            message: error.message,
-            kind,
-            user_messages: error.user_messages,
-            missing_scopes: error.missing_scopes,
-        }
-    }
 }
 
 impl Display for UsosErrorKind {
@@ -203,19 +150,6 @@ impl Display for UsosErrorKind {
     }
 }
 
-#[derive(Deserialize)]
-struct RawError {
-    message: String,
-    #[serde(rename = "error")]
-    kind: Option<ErrorKind>,
-    reason: Option<Reason>,
-    user_messages: Option<UserMessages>,
-    param_name: Option<String>,
-    field_name: Option<String>,
-    method_name: Option<String>,
-    missing_scopes: Option<Vec<Scope>>,
-}
-
 #[test]
 fn error_example_1() {
     let json = json!({
@@ -228,7 +162,7 @@ fn error_example_1() {
         },
     });
     let error = UsosError::deserialize(&json).unwrap();
-    println!("{error}")
+    println!("{error}");
 }
 
 #[test]
@@ -247,7 +181,25 @@ fn error_example_2() {
         },
     });
     let error = UsosError::deserialize(&json).unwrap();
-    println!("{error}")
+    println!("{error}");
+}
+
+#[test]
+fn error_example_2_no_other_fields_on_kind() {
+    let json = json!({
+        "message": "Required parameter fac_id is missing.",
+        "error": "object_forbidden",
+        "user_messages": {
+            "fields": {
+                "fac_id": {
+                    "en": "This field is required.",
+                    "pl": "To pole jest wymagane."
+                }
+            }
+        },
+    });
+    let error = UsosError::deserialize(&json).unwrap();
+    println!("{error}");
 }
 
 #[test]
@@ -269,5 +221,4 @@ fn error_example_3() {
     }
     );
     let error = UsosError::deserialize(&json).unwrap();
-    println!("{error}")
 }
