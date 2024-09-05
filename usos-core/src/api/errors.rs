@@ -90,7 +90,7 @@ pub enum UsosErrorKind {
         reason: Reason,
     },
     /// Some of the referenced objects do not exist.
-    ObjecetNotFound {
+    ObjectNotFound {
         param_name: String,
         method_name: String,
     },
@@ -137,7 +137,7 @@ impl Display for UsosErrorKind {
                 f,
                 "Field is forbidden: '{field_name}' Method: '{method_name}' Reason: {reason})"
             ),
-            UsosErrorKind::ObjecetNotFound {
+            UsosErrorKind::ObjectNotFound {
                 param_name,
                 method_name,
             } => write!(
@@ -221,4 +221,5 @@ fn error_example_3() {
     }
     );
     let error = UsosError::deserialize(&json).unwrap();
+    println!("{error}");
 }
