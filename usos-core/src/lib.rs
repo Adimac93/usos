@@ -1,6 +1,13 @@
 //! A crate that provides the lower-level abstractions on USOS API.
 //!
 //! If you intend to use more sophisticated features, consider using the higher-level `usos` crate.
+//!
+//! # Feature flags
+//! Following optional features are available:
+//!
+//! Name | Description | Default
+//! --- | --- | ---
+//! `keygen` | Enables consumer key generation API (see [`client`]) | No
 
 #![cfg_attr(debug_assertions, allow(unused))]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]

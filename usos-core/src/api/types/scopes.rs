@@ -4,7 +4,7 @@ use std::{collections::HashSet, fmt::Display, str::FromStr};
 
 use serde::Deserialize;
 
-/// A wrapper struct that contains a set of scopes.
+/// A wrapper struct that contains a set of authorization scopes.
 #[derive(Debug, Clone)]
 pub struct Scopes(HashSet<Scope>);
 

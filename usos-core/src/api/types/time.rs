@@ -9,10 +9,14 @@ use serde::{Deserialize, Serialize};
 use time::format_description::BorrowedFormatItem;
 use time::macros::format_description;
 
+/// Date format yyyy-mm-dd
 pub const DATE_FORMAT: &[BorrowedFormatItem<'_>] = format_description!("[year]-[month]-[day]");
+// Format time as hh:mm:ss
 pub const TIME_FORMAT: &[BorrowedFormatItem<'_>] = format_description!("[hour]:[minute]:[second]");
+/// Date time format yyyy-mm-dd hh:mm:ss
 pub const DATE_TIME_FORMAT: &[BorrowedFormatItem<'_>] =
     format_description!("[year]-[month]-[day] [hour]:[minute]:[second]");
+/// Precise date time yyyy-mm-dd hh:mm:ss.mmmmmm
 pub const PRECISE_DATE_TIME_FORMAT: &[BorrowedFormatItem<'_>] =
     format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6]");
 

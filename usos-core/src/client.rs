@@ -1,4 +1,9 @@
 //! The client used to call USOS API endpoints.
+//!
+//!	# Developer key (consumer key)
+//! To access some API features you will need to get a developer key (also called consumer key). In order to get one you have to sign up as a developer to the installation of your choice (see [`ConsumerKey`]).
+//! The full list of available installations can be found at [USOS installations API](https://apps.usos.edu.pl/developers/api/definitions/installations/) in the 'Current installations' section.
+//! For example you can sign in to the installation at [PWr USOS apps develpoer center](https://apps.usos.pwr.edu.pl/developers/)
 
 use std::{
     cell::LazyCell,
@@ -55,20 +60,6 @@ impl Client {
     pub fn authorized_from_key(mut self, consumer_key: ConsumerKey) -> Self {
         self.auth = Some(consumer_key);
         self
-    }
-
-    #[cfg(feature = "keygen")]
-    pub async fn authorized(
-        mut self,
-        app_name: &str,
-        website_url: Option<&str>,
-        email: &str,
-    ) -> crate::Result<Self> {
-        let consumer_key =
-            ConsumerKey::generate(&self.client, self.base_url(), app_name, website_url, email)
-                .await?;
-        self.auth = Some(consumer_key);
-        Ok(self)
     }
 
     pub fn builder(&self, uri: impl AsRef<str>) -> UsosRequestBuilder {
